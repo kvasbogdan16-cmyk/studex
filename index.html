@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Studex — робота для студентів</title>
+  <meta name="description" content="Studex — платформа, де студенти знаходять першу роботу, підробіток або волонтерство, а роботодавці — мотивованих молодих кандидатів.">
+  <meta name="theme-color" content="#5b3df5">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Studex — робота для студентів">
+  <meta property="og:description" content="Перша робота, підробіток або волонтерство. Платформа для студентів і роботодавців.">
+  <meta property="og:locale" content="uk_UA">
+
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Шапка -->
+  <header class="header" id="top">
+    <div class="container header__inner">
+      <a href="#top" class="logo" aria-label="Studex — на початок">
+        <span class="logo__mark">S</span>
+        <span class="logo__text">Studex</span>
+      </a>
+
+      <nav class="nav" id="nav" aria-label="Головне меню">
+        <a href="#formats" class="nav__link">Можливості</a>
+        <a href="#students" class="nav__link">Студентам</a>
+        <a href="#employers" class="nav__link">Роботодавцям</a>
+        <a href="#jobs" class="nav__link">Вакансії</a>
+      </nav>
+
+      <button class="burger" id="burger" aria-label="Відкрити меню" aria-expanded="false" aria-controls="nav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container hero__inner">
+        <div class="hero__content">
+          <span class="badge"><span class="badge__dot"></span>Скоро запуск</span>
+          <h1 class="hero__title">
+            Твоя <span class="highlight">перша робота</span> починається тут
+          </h1>
+          <p class="hero__text">
+            Studex з'єднує студентів і роботодавців. Постійна робота, підробіток між парами
+            чи волонтерство: обирай формат, який підходить саме тобі.
+          </p>
+          <div class="hero__actions">
+            <a href="#students" class="btn btn--primary">Я студент</a>
+            <a href="#employers" class="btn btn--ghost">Я роботодавець</a>
+          </div>
+        </div>
+
+        <div class="hero__visual" aria-hidden="true">
+          <div class="blob blob--violet"></div>
+          <div class="blob blob--lime"></div>
+          <div class="float-card float-card--1">
+            <span class="float-card__icon">⚖️</span>
+            <div>
+              <strong>Юрист</strong>
+              <small>Стажування · гібрид</small>
+            </div>
+          </div>
+          <div class="float-card float-card--2">
+            <span class="float-card__icon">👔</span>
+            <div>
+              <strong>Керівник</strong>
+              <small>Постійна · офіс</small>
+            </div>
+          </div>
+          <div class="float-card float-card--3">
+            <span class="float-card__icon">💻</span>
+            <div>
+              <strong>Програміст</strong>
+              <small>Підробіток · віддалено</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Три формати -->
+    <section class="section" id="formats">
+      <div class="container">
+        <div class="section__head reveal">
+          <span class="eyebrow">Можливості</span>
+          <h2 class="section__title">Три формати на будь-який ритм життя</h2>
+          <p class="section__text">Хочеш стабільний дохід, гнучкий графік чи досвід, що змінює світ? На Studex є все.</p>
+        </div>
+
+        <div class="formats">
+          <article class="format-card format-card--violet reveal">
+            <span class="format-card__icon">💼</span>
+            <h3>Постійна робота</h3>
+            <p>Повна чи часткова зайнятість для старту кар'єри. Стажування і junior-позиції, де цінують потенціал, а не роки досвіду.</p>
+          </article>
+          <article class="format-card format-card--coral reveal">
+            <span class="format-card__icon">⚡</span>
+            <h3>Підробіток</h3>
+            <p>Зміни на вечір, вихідні чи канікули. Заробляй, не жертвуючи навчанням, і обирай графік під свій розклад пар.</p>
+          </article>
+          <article class="format-card format-card--lime reveal">
+            <span class="format-card__icon">🌱</span>
+            <h3>Волонтерство</h3>
+            <p>Допомагай громаді, фондам та подіям. Отримуй досвід, знайомства і рядок у резюме, яким можна пишатися.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Студентам -->
+    <section class="section section--tinted" id="students">
+      <div class="container split">
+        <div class="split__intro reveal">
+          <span class="eyebrow">Студентам</span>
+          <h2 class="section__title">Робота, яка розуміє, що ти ще навчаєшся</h2>
+          <p class="section__text">Ми створили Studex, щоб перший крок у кар'єрі був простим і безпечним, навіть якщо в резюме поки порожньо.</p>
+          <a href="#jobs" class="btn btn--primary">Подивитись вакансії</a>
+        </div>
+
+        <ul class="benefits">
+          <li class="benefit reveal">
+            <span class="benefit__icon">🎓</span>
+            <div>
+              <h3>Можна без досвіду</h3>
+              <p>Вакансії, де готові навчати і дати шанс новачку.</p>
+            </div>
+          </li>
+          <li class="benefit reveal">
+            <span class="benefit__icon">🗓️</span>
+            <div>
+              <h3>Графік під навчання</h3>
+              <p>Фільтруй роботу за годинами: зранку, ввечері чи лише у вихідні.</p>
+            </div>
+          </li>
+          <li class="benefit reveal">
+            <span class="benefit__icon">🛡️</span>
+            <div>
+              <h3>Перевірені роботодавці</h3>
+              <p>Ми перевіряємо компанії, щоб ти не натрапив на шахраїв.</p>
+            </div>
+          </li>
+          <li class="benefit reveal">
+            <span class="benefit__icon">📄</span>
+            <div>
+              <h3>Досвід для резюме</h3>
+              <p>Кожна робота і волонтерство додають реальні навички до твого профілю.</p>
+            </div>
+          </li>
+          <li class="benefit reveal">
+            <span class="benefit__icon">📍</span>
+            <div>
+              <h3>Поруч або віддалено</h3>
+              <p>Шукай роботу біля дому, університету або з ноутбука в гуртожитку.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Роботодавцям -->
+    <section class="section" id="employers">
+      <div class="container split split--reverse">
+        <div class="split__intro reveal">
+          <span class="eyebrow eyebrow--coral">Роботодавцям</span>
+          <h2 class="section__title">Енергійна команда, яку ви шукали</h2>
+          <p class="section__text">Studex допомагає швидко знайти молодих, мотивованих людей: на постійну позицію, на сезон чи на одну подію.</p>
+        </div>
+
+        <ul class="benefits">
+          <li class="benefit reveal">
+            <span class="benefit__icon">🚀</span>
+            <div>
+              <h3>Мотивовані кандидати</h3>
+              <p>Студенти, які хочуть вчитися, рости і проявити себе.</p>
+            </div>
+          </li>
+          <li class="benefit reveal">
+            <span class="benefit__icon">⏱️</span>
+            <div>
+              <h3>Швидкий пошук</h3>
+              <p>Закрийте зміну, сезон чи пікове навантаження без довгих співбесід.</p>
+            </div>
+          </li>
+          <li class="benefit reveal">
+            <span class="benefit__icon">🌟</span>
+            <div>
+              <h3>Стажери з потенціалом</h3>
+              <p>Виховайте майбутніх фахівців у своїй команді з самого старту.</p>
+            </div>
+          </li>
+          <li class="benefit reveal">
+            <span class="benefit__icon">🤲</span>
+            <div>
+              <h3>Волонтери для ГО та подій</h3>
+              <p>Громадські організації і фонди знайдуть небайдужих помічників.</p>
+            </div>
+          </li>
+          <li class="benefit reveal">
+            <span class="benefit__icon">📣</span>
+            <div>
+              <h3>Бренд роботодавця</h3>
+              <p>Станьте компанією, про яку знає і говорить молодь.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Вакансії -->
+    <section class="section section--tinted" id="jobs">
+      <div class="container">
+        <div class="section__head reveal">
+          <span class="eyebrow">Вакансії</span>
+          <h2 class="section__title">Що можна буде знайти на Studex</h2>
+          <p class="section__text">Ось кілька прикладів того, як виглядатимуть пропозиції на платформі.</p>
+        </div>
+
+        <div class="filters reveal" role="tablist" aria-label="Фільтр вакансій">
+          <button class="filter is-active" data-filter="all" role="tab" aria-selected="true">Усі</button>
+          <button class="filter" data-filter="full" role="tab" aria-selected="false">Постійна</button>
+          <button class="filter" data-filter="part" role="tab" aria-selected="false">Підробіток</button>
+          <button class="filter" data-filter="volunteer" role="tab" aria-selected="false">Волонтерство</button>
+        </div>
+
+        <div class="jobs" id="jobs-list">
+          <article class="job" data-type="part">
+            <div class="job__top">
+              <span class="job__icon">☕</span>
+              <span class="tag tag--part">Підробіток</span>
+            </div>
+            <h3 class="job__title">Бариста</h3>
+            <p class="job__company">Кав'ярня в центрі міста</p>
+            <ul class="job__meta">
+              <li>🕒 Вечори та вихідні</li>
+              <li>📍 Офлайн</li>
+              <li>🎓 Без досвіду</li>
+            </ul>
+          </article>
+
+          <article class="job" data-type="full">
+            <div class="job__top">
+              <span class="job__icon">📱</span>
+              <span class="tag tag--full">Постійна</span>
+            </div>
+            <h3 class="job__title">SMM-стажер</h3>
+            <p class="job__company">Діджитал-агенція</p>
+            <ul class="job__meta">
+              <li>🕒 Часткова зайнятість</li>
+              <li>📍 Гібрид</li>
+              <li>📚 Навчання в команді</li>
+            </ul>
+          </article>
+
+          <article class="job" data-type="part">
+            <div class="job__top">
+              <span class="job__icon">📐</span>
+              <span class="tag tag--part">Підробіток</span>
+            </div>
+            <h3 class="job__title">Репетитор з математики</h3>
+            <p class="job__company">Освітній онлайн-центр</p>
+            <ul class="job__meta">
+              <li>🕒 Свій графік</li>
+              <li>📍 Віддалено</li>
+              <li>👩‍🎓 Для 2+ курсу</li>
+            </ul>
+          </article>
+
+          <article class="job" data-type="part">
+            <div class="job__top">
+              <span class="job__icon">🛵</span>
+              <span class="tag tag--part">Підробіток</span>
+            </div>
+            <h3 class="job__title">Кур'єр</h3>
+            <p class="job__company">Служба доставки</p>
+            <ul class="job__meta">
+              <li>🕒 Зміни від 4 годин</li>
+              <li>📍 Офлайн</li>
+              <li>💸 Щотижнева оплата</li>
+            </ul>
+          </article>
+
+          <article class="job" data-type="volunteer">
+            <div class="job__top">
+              <span class="job__icon">🎪</span>
+              <span class="tag tag--volunteer">Волонтерство</span>
+            </div>
+            <h3 class="job__title">Волонтер на фестивалі</h3>
+            <p class="job__company">Міський культурний фестиваль</p>
+            <ul class="job__meta">
+              <li>🕒 Вихідні</li>
+              <li>📍 Офлайн</li>
+              <li>📜 Сертифікат учасника</li>
+            </ul>
+          </article>
+
+          <article class="job" data-type="full">
+            <div class="job__top">
+              <span class="job__icon">🧪</span>
+              <span class="tag tag--full">Постійна</span>
+            </div>
+            <h3 class="job__title">Junior QA-тестувальник</h3>
+            <p class="job__company">IT-компанія</p>
+            <ul class="job__meta">
+              <li>🕒 Повна зайнятість</li>
+              <li>📍 Віддалено</li>
+              <li>🧑‍🏫 Ментор на старті</li>
+            </ul>
+          </article>
+
+          <article class="job" data-type="volunteer">
+            <div class="job__top">
+              <span class="job__icon">🐾</span>
+              <span class="tag tag--volunteer">Волонтерство</span>
+            </div>
+            <h3 class="job__title">Помічник у притулку</h3>
+            <p class="job__company">Притулок для тварин</p>
+            <ul class="job__meta">
+              <li>🕒 2–3 години на тиждень</li>
+              <li>📍 Офлайн</li>
+              <li>❤️ Без досвіду</li>
+            </ul>
+          </article>
+
+          <article class="job" data-type="full">
+            <div class="job__top">
+              <span class="job__icon">🎨</span>
+              <span class="tag tag--full">Постійна</span>
+            </div>
+            <h3 class="job__title">Junior-дизайнер</h3>
+            <p class="job__company">Продуктова студія</p>
+            <ul class="job__meta">
+              <li>🕒 Повна зайнятість</li>
+              <li>📍 Гібрид</li>
+              <li>🖼️ Достатньо портфоліо</li>
+            </ul>
+          </article>
+        </div>
+
+        <p class="jobs__note">* Вакансії наведено як приклад. Реальні пропозиції з'являться після запуску.</p>
+      </div>
+    </section>
+
+    <!-- Фінальний банер -->
+    <section class="section">
+      <div class="container">
+        <div class="cta reveal">
+          <div class="cta__deco cta__deco--1" aria-hidden="true"></div>
+          <div class="cta__deco cta__deco--2" aria-hidden="true"></div>
+          <span class="badge badge--light"><span class="badge__dot"></span>Скоро запуск</span>
+          <h2 class="cta__title">Studex скоро запуститься</h2>
+          <p class="cta__text">Перша робота — це не страшно. Це перший крок до того, ким ти станеш.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Футер -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <a href="#top" class="logo logo--light">
+        <span class="logo__mark">S</span>
+        <span class="logo__text">Studex</span>
+      </a>
+      <nav class="footer__nav" aria-label="Навігація у футері">
+        <a href="#formats">Можливості</a>
+        <a href="#students">Студентам</a>
+        <a href="#employers">Роботодавцям</a>
+        <a href="#jobs">Вакансії</a>
+      </nav>
+      <p class="footer__copy">© 2026 Studex. Робота для студентів.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
