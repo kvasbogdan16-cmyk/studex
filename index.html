@@ -33,6 +33,7 @@
         <a href="#students" class="nav__link">Студентам</a>
         <a href="#employers" class="nav__link">Роботодавцям</a>
         <a href="#jobs" class="nav__link">Вакансії</a>
+        <a href="#apply" class="nav__link">Заявка</a>
       </nav>
 
       <button class="burger" id="burger" aria-label="Відкрити меню" aria-expanded="false" aria-controls="nav">
@@ -350,15 +351,46 @@
       </div>
     </section>
 
-    <!-- Фінальний банер -->
-    <section class="section">
+    <!-- Фінальний банер із формою заявки -->
+    <section class="section" id="apply">
       <div class="container">
         <div class="cta reveal">
           <div class="cta__deco cta__deco--1" aria-hidden="true"></div>
           <div class="cta__deco cta__deco--2" aria-hidden="true"></div>
           <span class="badge badge--light"><span class="badge__dot"></span>Скоро запуск</span>
           <h2 class="cta__title">Studex скоро запуститься</h2>
-          <p class="cta__text">Перша робота — це не страшно. Це перший крок до того, ким ти станеш.</p>
+          <p class="cta__text">Перша робота — це не страшно. Це перший крок до того, ким ти станеш. Залиш заявку, і ми напишемо тобі в день запуску.</p>
+
+          <div class="apply">
+            <form class="apply__form" id="apply-form" novalidate>
+              <div class="field">
+                <label for="apply-name">Ім'я</label>
+                <input id="apply-name" name="name" type="text" autocomplete="name" placeholder="Як до тебе звертатися" required minlength="2">
+                <span class="field__error" id="apply-name-error"></span>
+              </div>
+
+              <div class="field">
+                <label for="apply-phone">Телефон</label>
+                <input id="apply-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+380 XX XXX XX XX" required>
+                <span class="field__error" id="apply-phone-error"></span>
+              </div>
+
+              <div class="field">
+                <label for="apply-comment">Коментар <span class="field__optional">(необов'язково)</span></label>
+                <textarea id="apply-comment" name="comment" rows="3" placeholder="Яку роботу шукаєш або кого хочеш знайти?"></textarea>
+              </div>
+
+              <p class="apply__error" id="apply-form-error" role="alert"></p>
+              <button type="submit" class="btn btn--lime apply__submit">Надіслати заявку</button>
+            </form>
+
+            <div class="apply__success" id="apply-success" role="status" tabindex="-1" hidden>
+              <span class="apply__success-icon" aria-hidden="true">✓</span>
+              <h3>Дякуємо, заявку отримано!</h3>
+              <p id="apply-success-text">Ми зв'яжемося з тобою найближчим часом.</p>
+              <button type="button" class="btn btn--ghost" id="apply-again">Надіслати ще одну</button>
+            </div>
+          </div>
         </div>
       </div>
     </section>

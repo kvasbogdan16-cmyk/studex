@@ -54,6 +54,112 @@ filters.forEach((btn) => {
   });
 });
 
+// Форма заявки → /api/lead → Supabase + Telegram
+const applyForm = document.getElementById("apply-form");
+const applySuccess = document.getElementById("apply-success");
+const applySuccessText = document.getElementById("apply-success-text");
+const applyAgain = document.getElementById("apply-again");
+
+function setFieldError(input, message) {
+  const field = input.closest(".field");
+  const error = document.getElementById(input.id + "-error");
+  field.classList.toggle("is-invalid", Boolean(message));
+  input.setAttribute("aria-invalid", message ? "true" : "false");
+  if (error) {
+    error.textContent = message;
+    input.setAttribute("aria-describedby", error.id);
+  }
+}
+
+function validateName(input) {
+  const value = input.value.trim();
+  if (!value) return "Вкажи своє ім'я";
+  if (value.length < 2) return "Ім'я має містити хоча б 2 літери";
+  return "";
+}
+
+function validatePhone(input) {
+  const digits = input.value.replace(/\D/g, "");
+  if (!digits) return "Вкажи номер телефону";
+  if (digits.length < 10 || digits.length > 13) return "Перевір номер: наприклад, +380 67 123 45 67";
+  return "";
+}
+
+const validators = [
+  [applyForm.elements.name, validateName],
+  [applyForm.elements.phone, validatePhone],
+];
+
+// Прибираємо помилку, щойно користувач виправив поле
+validators.forEach(([input, validate]) => {
+  input.addEventListener("input", () => {
+    if (input.closest(".field").classList.contains("is-invalid")) {
+      setFieldError(input, validate(input));
+    }
+  });
+});
+
+applyForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+
+  let firstInvalid = null;
+  validators.forEach(([input, validate]) => {
+    const message = validate(input);
+    setFieldError(input, message);
+    if (message && !firstInvalid) firstInvalid = input;
+  });
+
+  if (firstInvalid) {
+    firstInvalid.focus();
+    return;
+  }
+
+  sendApplication();
+});
+
+async function sendApplication() {
+  const submitBtn = applyForm.querySelector(".apply__submit");
+  const formError = document.getElementById("apply-form-error");
+  const name = applyForm.elements.name.value.trim();
+  const lead = {
+    name,
+    phone: applyForm.elements.phone.value.trim(),
+    comment: applyForm.elements.comment.value.trim() || null,
+  };
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Надсилаємо…";
+  formError.textContent = "";
+
+  try {
+    // Серверний обробник (api/lead.js): зберігає в Supabase і надсилає сповіщення в Telegram
+    const res = await fetch("/api/lead", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(lead),
+    });
+    if (!res.ok) throw new Error(`api/lead ${res.status}: ${await res.text()}`);
+
+    applySuccessText.textContent = `${name}, ми зв'яжемося з тобою найближчим часом.`;
+    applyForm.hidden = true;
+    applySuccess.hidden = false;
+    applySuccess.focus();
+  } catch (err) {
+    console.error(err);
+    formError.textContent = "Не вдалося надіслати заявку. Перевір інтернет і спробуй ще раз.";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Надіслати заявку";
+  }
+}
+
+applyAgain.addEventListener("click", () => {
+  applyForm.reset();
+  applyForm.hidden = false;
+  applySuccess.hidden = true;
+  applyForm.elements.name.focus();
+});
+
 // Плавна поява блоків
 const revealItems = document.querySelectorAll(".reveal");
 

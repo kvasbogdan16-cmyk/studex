@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Адмін-панель — Studex</title>
+  <meta name="theme-color" content="#5b3df5">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin">
+
+  <header class="header admin-header">
+    <div class="container header__inner">
+      <a href="/" class="logo" aria-label="Studex — на сайт">
+        <span class="logo__mark">S</span>
+        <span class="logo__text">Studex</span>
+        <span class="admin-header__tag">адмін</span>
+      </a>
+      <div class="admin-header__user" id="user-box" hidden>
+        <span class="admin-header__email" id="user-email"></span>
+        <button class="btn btn--ghost btn--sm" id="logout">Вийти</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <!-- Завантаження -->
+    <div class="container admin-loading" id="view-loading">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>Завантаження…</span>
+    </div>
+
+    <!-- Вхід -->
+    <section class="container admin-login" id="view-login" hidden>
+      <div class="login-card">
+        <span class="eyebrow">Адмін-панель</span>
+        <h1 class="login-card__title">Вхід</h1>
+        <p class="login-card__text">Розділ лише для команди Studex.</p>
+
+        <form class="apply__form" id="login-form" novalidate>
+          <div class="field">
+            <label for="login-email">Email</label>
+            <input id="login-email" name="email" type="email" autocomplete="username" required>
+          </div>
+          <div class="field">
+            <label for="login-password">Пароль</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+          </div>
+          <p class="apply__error" id="login-error" role="alert"></p>
+          <button type="submit" class="btn btn--primary apply__submit" id="login-submit">Увійти</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Заявки -->
+    <section class="container admin-leads" id="view-leads" hidden>
+      <div class="admin-leads__head">
+        <div>
+          <h1 class="admin-leads__title">Заявки</h1>
+          <p class="admin-leads__sub">Нові зверху. Статус змінюється одразу.</p>
+        </div>
+        <button class="btn btn--ghost btn--sm" id="refresh" aria-label="Оновити список">↻ Оновити</button>
+      </div>
+
+      <div class="filters admin-filters" role="tablist" aria-label="Фільтр за статусом" id="status-filters">
+        <button class="filter is-active" data-status="all" role="tab" aria-selected="true">Усі <span class="filter__count" data-count="all">0</span></button>
+        <button class="filter" data-status="нова" role="tab" aria-selected="false">Нові <span class="filter__count" data-count="нова">0</span></button>
+        <button class="filter" data-status="в роботі" role="tab" aria-selected="false">В роботі <span class="filter__count" data-count="в роботі">0</span></button>
+        <button class="filter" data-status="закрита" role="tab" aria-selected="false">Закриті <span class="filter__count" data-count="закрита">0</span></button>
+      </div>
+
+      <p class="apply__error" id="leads-error" role="alert"></p>
+      <div class="leads" id="leads-list" aria-live="polite"></div>
+      <p class="leads__empty" id="leads-empty" hidden>Тут поки порожньо.</p>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <template id="lead-template">
+    <article class="lead">
+      <div class="lead__top">
+        <div>
+          <h2 class="lead__name"></h2>
+          <time class="lead__date"></time>
+        </div>
+        <label class="lead__status">
+          <span class="visually-hidden">Статус заявки</span>
+          <select>
+            <option value="нова">Нова</option>
+            <option value="в роботі">В роботі</option>
+            <option value="закрита">Закрита</option>
+          </select>
+        </label>
+      </div>
+      <a class="lead__phone"></a>
+      <p class="lead__comment"></p>
+    </article>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

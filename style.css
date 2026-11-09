@@ -826,6 +826,159 @@ button {
   .cta { padding: 96px 48px; }
 }
 
+/* ===== Форма заявки ===== */
+.btn--lime {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.btn--lime:hover {
+  background: #b5e61f;
+}
+
+.apply {
+  position: relative;
+  max-width: 520px;
+  margin: 36px auto 0;
+  padding: 28px 22px;
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .apply { padding: 36px; }
+}
+
+.apply__form {
+  display: grid;
+  gap: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field label {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.field__optional {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 13px 16px;
+  font: inherit;
+  font-size: 16px; /* щоб iOS не збільшував сторінку під час введення */
+  color: var(--ink);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--muted);
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--violet);
+  background: var(--surface);
+}
+
+.field.is-invalid input {
+  border-color: var(--coral);
+}
+
+.field__error {
+  min-height: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #d9402f;
+}
+
+.field__error:empty {
+  display: none;
+}
+
+.apply__error {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--coral-soft);
+  color: #b3281a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.apply__error:empty {
+  display: none;
+}
+
+.apply__submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.apply__submit:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
+.apply__success {
+  text-align: center;
+  padding: 12px 0;
+}
+
+.apply__form[hidden],
+.apply__success[hidden] {
+  display: none;
+}
+
+.apply__success:focus {
+  outline: none;
+}
+
+.apply__success-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 30px;
+  font-weight: 800;
+  animation: pop 0.35s ease both;
+}
+
+.apply__success h3 {
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+
+.apply__success p {
+  color: var(--ink-soft);
+  margin-bottom: 24px;
+}
+
 /* ===== Футер ===== */
 .footer {
   padding: 48px 0;
