@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [".claude/hooks/after-plan-dev-server.js"],
+            "timeout": 15,
+            "statusMessage": "Перевіряю, чи треба перезапустити дев-сервер"
+          }
+        ]
+      }
+    ]
+  }
+}

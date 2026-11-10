@@ -1,3 +1,6 @@
 *.sql
 .env*
 README.md
+.claude
+scripts
+.dev-server.log
