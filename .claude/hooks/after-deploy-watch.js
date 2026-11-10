@@ -1,0 +1,38 @@
+// PostToolUse hook (PowerShell/Bash): after a deploy command or git push,
+// tell Claude to run the `deploy-status` subagent to watch the deployment.
+let raw = "";
+process.stdin.on("data", (c) => (raw += c));
+process.stdin.on("end", () => {
+  try {
+    const input = JSON.parse(raw.replace(/^﻿/, "").trim() || "{}");
+    if (input.agent_type === "deploy-status") return; // the watcher itself redeploys — no loop
+
+    const cmd = String((input.tool_input && input.tool_input.command) || "");
+    const isCliDeploy = /\bvercel(\.cmd|\.ps1)?\s+(deploy|redeploy|--prod)\b/i.test(cmd) ||
+      /\bvercel(\.cmd|\.ps1)?\s*(--yes|-y)?\s*(;|&|\||$)/im.test(cmd);
+    const isPush = /\bgit\s+push\b/i.test(cmd);
+    if (!isCliDeploy && !isPush) return;
+
+    const output = JSON.stringify((input.tool_response && (input.tool_response.stdout || input.tool_response.output)) || input.tool_response || "");
+    const url = (output.match(/https:\/\/[a-z0-9-]+-[a-z0-9]+\.vercel\.app/i) || [])[0];
+    const since = Date.now() - 60_000;
+
+    const how = url
+      ? `Деплой: ${url} — передай агенту цей URL.`
+      : isPush
+        ? `Це git push: передай агенту, щоб стежив з --since=${since}.`
+        : `URL деплою не знайдено у виводі — агент візьме найновіший деплой.`;
+
+    process.stdout.write(JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PostToolUse",
+        additionalContext:
+          `Щойно запущено деплой. Запусти субагента deploy-status (Agent, subagent_type: "deploy-status"), ` +
+          `щоб він стежив за статусом кожні 10 с і виправив помилку, якщо деплой впаде. ${how} ` +
+          `Якщо ти сам і є агент deploy-status — ігноруй це повідомлення і продовжуй стеження.`,
+      },
+    }));
+  } catch {
+    // never break the session because of this hook
+  }
+});
