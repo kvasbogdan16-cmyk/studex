@@ -334,6 +334,19 @@
 .lead__email:hover { text-decoration: underline; }
 .lead__email[hidden] { display: none; }
 
+.lead__telegram {
+  align-self: flex-start;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1c93e3;
+}
+
+.lead__telegram:hover { text-decoration: underline; }
+.lead__telegram[hidden] { display: none; }
+
+.lead__source[data-source="Telegram"] { background: #e3f2fd; color: #1c7cc4; }
+.lead__source[data-source="Візитка"] { background: var(--lime-soft); color: #4a6b00; }
+
 .lead__doc {
   align-self: flex-start;
   padding: 4px 10px;

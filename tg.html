@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Studex у Telegram</title>
+  <meta name="theme-color" content="#5b3df5">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tg.css">
+  <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
+</head>
+<body>
+  <!-- Завантаження -->
+  <main class="screen screen--center" id="view-loading">
+    <span class="spinner" aria-hidden="true"></span>
+    <p class="muted">Завантаження…</p>
+  </main>
+
+  <!-- Відкрито не в Telegram: жодних даних -->
+  <main class="screen screen--center" id="view-outside" hidden>
+    <div class="logo"><span class="logo__mark">S</span> Studex</div>
+    <h1 class="title">Відкрий Studex у Telegram</h1>
+    <p class="muted">Вакансії й заявки доступні лише в нашому боті: так ми знаємо, хто ти, і показуємо тільки твої заявки.</p>
+    <a class="btn btn--primary" id="bot-link" href="https://t.me/" hidden>Відкрити бота</a>
+  </main>
+
+  <!-- Помилка -->
+  <main class="screen screen--center" id="view-error" hidden>
+    <h1 class="title">Не вдалося завантажити</h1>
+    <p class="muted" id="error-text"></p>
+    <button class="btn btn--primary" id="error-retry" type="button">Спробувати ще раз</button>
+  </main>
+
+  <!-- Додаток -->
+  <main class="screen" id="view-app" hidden>
+    <header class="hello">
+      <div class="logo"><span class="logo__mark">S</span> Studex</div>
+      <h1 class="title" id="hello-title">Привіт!</h1>
+      <p class="muted">Обери вакансію і відгукнись — ми зв'яжемося з тобою.</p>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Розділи">
+      <button class="tab is-active" type="button" role="tab" aria-selected="true" data-tab="jobs">Вакансії</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="mine">Мої заявки <span class="tab__count" id="mine-count">0</span></button>
+    </nav>
+
+    <section id="tab-jobs">
+      <div class="chips" role="group" aria-label="Тип роботи">
+        <button class="chip is-active" type="button" data-type="all">Усі</button>
+        <button class="chip" type="button" data-type="full">Постійна</button>
+        <button class="chip" type="button" data-type="part">Підробіток</button>
+        <button class="chip" type="button" data-type="volunteer">Волонтерство</button>
+      </div>
+      <div class="jobs" id="jobs"></div>
+    </section>
+
+    <section id="tab-mine" hidden>
+      <div class="mine" id="mine"></div>
+      <p class="empty" id="mine-empty">Ти ще не відгукувався на вакансії. Обери щось у вкладці «Вакансії».</p>
+    </section>
+  </main>
+
+  <!-- Заявка -->
+  <main class="screen" id="view-apply" hidden>
+    <div class="apply-job" id="apply-job"></div>
+
+    <form class="form" id="apply-form" novalidate>
+      <div class="field">
+        <span class="field__label">Ім'я</span>
+        <p class="field__static" id="apply-name"></p>
+        <span class="field__hint">Беремо з твого профілю Telegram</span>
+      </div>
+      <div class="field">
+        <label class="field__label" for="apply-phone">Телефон</label>
+        <input id="apply-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+380 XX XXX XX XX" required maxlength="30">
+        <button class="link-btn" type="button" id="share-phone" hidden>📱 Взяти номер із Telegram</button>
+      </div>
+      <div class="field">
+        <label class="field__label" for="apply-comment">Коментар <span class="field__hint">(необов'язково)</span></label>
+        <textarea id="apply-comment" name="comment" rows="3" maxlength="800" placeholder="Коли тобі зручно працювати, досвід"></textarea>
+      </div>
+      <p class="error" id="apply-error" role="alert"></p>
+      <button class="btn btn--primary btn--block" type="submit" id="apply-submit">Надіслати заявку</button>
+      <button class="btn btn--ghost btn--block" type="button" id="apply-cancel">Назад до вакансій</button>
+    </form>
+  </main>
+
+  <!-- Готово -->
+  <main class="screen screen--center" id="view-done" hidden>
+    <div class="done-icon" aria-hidden="true">✓</div>
+    <h1 class="title">Заявку надіслано</h1>
+    <p class="muted" id="done-text"></p>
+    <button class="btn btn--primary" type="button" id="done-mine">Мої заявки</button>
+    <button class="btn btn--ghost" type="button" id="done-jobs">До вакансій</button>
+  </main>
+
+  <template id="job-template">
+    <article class="job">
+      <div class="job__top">
+        <span class="job__icon"></span>
+        <span class="tag"></span>
+      </div>
+      <h2 class="job__title"></h2>
+      <p class="job__company"></p>
+      <ul class="job__meta"></ul>
+      <button class="btn btn--primary btn--block job__apply" type="button">Відгукнутися</button>
+    </article>
+  </template>
+
+  <script src="tg.js"></script>
+</body>
+</html>

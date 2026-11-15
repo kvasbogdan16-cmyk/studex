@@ -59,7 +59,8 @@ async function findChatId(token) {
   return messages.length ? messages[messages.length - 1].chat.id : null;
 }
 
-function buildMessage(lead) {
+// source — звідки заявка; extra — додаткові рядки (наприклад, нікнейм у Telegram)
+function buildMessage(lead, { source = "Сайт", extra = [] } = {}) {
   const date = new Intl.DateTimeFormat("uk-UA", {
     timeZone: "Europe/Kyiv",
     day: "numeric",
@@ -69,13 +70,14 @@ function buildMessage(lead) {
   }).format(new Date());
 
   const lines = [
-    "🆕 <b>Нова заявка на Studex</b>",
+    source === "Сайт" ? "🆕 <b>Нова заявка на Studex</b>" : `🆕 <b>Нова заявка на Studex (${escapeHtml(source)})</b>`,
     "",
     `👤 <b>Ім'я:</b> ${escapeHtml(lead.name)}`,
+    ...extra.map(escapeHtml),
     `📞 <b>Телефон:</b> ${escapeHtml(lead.phone)}`,
     `💬 <b>Коментар:</b> ${lead.comment ? escapeHtml(lead.comment) : "—"}`,
     `🕒 <b>Час:</b> ${date}`,
-    `🌐 <b>Джерело:</b> Сайт`,
+    `🌐 <b>Джерело:</b> ${escapeHtml(source)}`,
     `📌 <b>Етап:</b> Нова`,
     "",
     `<a href="${ADMIN_URL}">Відкрити адмін-панель</a>`,
@@ -83,7 +85,7 @@ function buildMessage(lead) {
   return lines.join("\n");
 }
 
-async function notifyTelegram(lead) {
+async function notifyTelegram(lead, options) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     console.warn("[telegram] TELEGRAM_BOT_TOKEN не задано — сповіщення пропущено");
@@ -105,7 +107,7 @@ async function notifyTelegram(lead) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
-      text: buildMessage(lead),
+      text: buildMessage(lead, options),
       parse_mode: "HTML",
       disable_web_page_preview: true,
     }),
@@ -156,4 +158,5 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.buildMessage = buildMessage;
+module.exports.notifyTelegram = notifyTelegram;
 module.exports.validate = validate;

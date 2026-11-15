@@ -26,7 +26,8 @@ const addError = document.getElementById("add-error");
 const addSubmit = document.getElementById("add-submit");
 const addStage = document.getElementById("add-stage");
 
-const LEAD_FIELDS = "id, created_at, name, phone, comment, source, stage_id, company, job_title, email, document_path";
+const LEAD_FIELDS =
+  "id, created_at, name, phone, comment, source, stage_id, company, job_title, email, document_path, telegram_username";
 const HISTORY_FIELDS = "id, lead_id, from_stage_id, to_stage_id, changed_at";
 
 const dateFormat = new Intl.DateTimeFormat("uk-UA", {
@@ -268,6 +269,13 @@ function renderLead(lead) {
     email.textContent = lead.email;
     email.href = "mailto:" + lead.email;
     email.hidden = false;
+  }
+
+  const telegram = card.querySelector(".lead__telegram");
+  if (lead.telegram_username) {
+    telegram.textContent = "✈️ @" + lead.telegram_username;
+    telegram.href = "https://t.me/" + encodeURIComponent(lead.telegram_username);
+    telegram.hidden = false;
   }
 
   card.querySelector(".lead__comment").textContent = lead.comment || "";
