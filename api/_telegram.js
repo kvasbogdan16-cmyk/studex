@@ -5,6 +5,11 @@ const crypto = require("crypto");
 
 const INIT_DATA_MAX_AGE = 24 * 60 * 60; // секунд: старіші дані відкидаємо
 
+// Значення змінної Vercel без зайвих пробілів і переносів рядка (їх легко додати під час вставки)
+function env(name) {
+  return (process.env[name] || "").trim();
+}
+
 class HttpError extends Error {
   constructor(status, message) {
     super(message);
@@ -61,7 +66,9 @@ function displayName(user) {
 
 // Виклик функції бази через publishable-ключ (дозволи — у supabase-telegram.sql)
 async function rpc(name, args) {
-  const { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, TG_SERVER_SECRET } = process.env;
+  const SUPABASE_URL = env("SUPABASE_URL");
+  const SUPABASE_PUBLISHABLE_KEY = env("SUPABASE_PUBLISHABLE_KEY");
+  const TG_SERVER_SECRET = env("TG_SERVER_SECRET");
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY || !TG_SERVER_SECRET) {
     throw new HttpError(500, "Сервер не налаштований: бракує змінних у Vercel.");
   }
@@ -97,4 +104,4 @@ function sendError(res, err) {
   return res.status(500).json({ error: "Щось пішло не так. Спробуй ще раз." });
 }
 
-module.exports = { HttpError, verifyInitData, displayName, rpc, parseBody, sendError };
+module.exports = { env, HttpError, verifyInitData, displayName, rpc, parseBody, sendError };

@@ -78,10 +78,12 @@ function readFile(body) {
 }
 
 async function recognize({ mediaType, data }) {
-  if (!process.env.ANTHROPIC_API_KEY) throw new HttpError(500, "Ключ Claude API не налаштовано у Vercel.");
+  // trim: під час вставки ключа у Vercel легко захопити пробіл або перенос рядка
+  const apiKey = (process.env.ANTHROPIC_API_KEY || "").trim();
+  if (!apiKey) throw new HttpError(500, "Ключ Claude API не налаштовано у Vercel.");
 
   // Тайм-аут менший за maxDuration функції (60 с), щоб встигнути відповісти зрозумілою помилкою
-  const client = new Anthropic({ timeout: 50_000, maxRetries: 1 });
+  const client = new Anthropic({ apiKey, timeout: 50_000, maxRetries: 1 });
 
   const fileBlock =
     mediaType === "application/pdf"

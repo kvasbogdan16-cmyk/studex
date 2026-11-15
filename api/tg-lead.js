@@ -1,7 +1,7 @@
 // POST /api/tg-lead — заявка з Telegram Mini App потрапляє в CRM з джерелом «Telegram».
 // Ім'я та ID беремо з перевірених даних Telegram, а не з того, що надіслав браузер.
 
-const { HttpError, verifyInitData, displayName, rpc, parseBody, sendError } = require("./_telegram");
+const { env, HttpError, verifyInitData, displayName, rpc, parseBody, sendError } = require("./_telegram");
 const { notifyTelegram } = require("./lead");
 
 function text(value, max) {
@@ -15,7 +15,7 @@ module.exports = async function handler(req, res) {
   }
   try {
     const body = parseBody(req);
-    const user = verifyInitData(body.initData, process.env.TELEGRAM_BOT_TOKEN);
+    const user = verifyInitData(body.initData, env("TELEGRAM_BOT_TOKEN"));
 
     const phone = text(body.phone, 30);
     const digits = phone.replace(/\D/g, "");

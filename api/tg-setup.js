@@ -2,9 +2,10 @@
 // Захищено секретом TG_SERVER_SECRET (заголовок X-Setup-Secret), тож викликати може лише власник.
 
 const crypto = require("crypto");
+const { env } = require("./_telegram");
 
 async function bot(method, payload) {
-  const res = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${method}`, {
+  const res = await fetch(`https://api.telegram.org/bot${env("TELEGRAM_BOT_TOKEN")}/${method}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload || {}),
@@ -26,10 +27,10 @@ module.exports = async function handler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!sameSecret(req.headers["x-setup-secret"], process.env.TG_SERVER_SECRET)) {
+  if (!sameSecret(req.headers["x-setup-secret"], env("TG_SERVER_SECRET"))) {
     return res.status(403).json({ error: "Forbidden" });
   }
-  if (!process.env.TELEGRAM_BOT_TOKEN) return res.status(500).json({ error: "TELEGRAM_BOT_TOKEN не задано" });
+  if (!env("TELEGRAM_BOT_TOKEN")) return res.status(500).json({ error: "TELEGRAM_BOT_TOKEN не задано" });
 
   try {
     const url = `https://${req.headers.host}/tg`;

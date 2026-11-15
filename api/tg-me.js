@@ -1,7 +1,7 @@
 // POST /api/tg-me — хто відкрив Mini App і його заявки.
 // Користувача беремо лише з initData, підпис якого перевіряємо ключем бота.
 
-const { verifyInitData, displayName, rpc, parseBody, sendError } = require("./_telegram");
+const { env, verifyInitData, displayName, rpc, parseBody, sendError } = require("./_telegram");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
   }
   try {
     const { initData } = parseBody(req);
-    const user = verifyInitData(initData, process.env.TELEGRAM_BOT_TOKEN);
+    const user = verifyInitData(initData, env("TELEGRAM_BOT_TOKEN"));
     const leads = await rpc("tg_my_leads", { p_telegram_id: user.id });
 
     res.setHeader("Cache-Control", "no-store");
