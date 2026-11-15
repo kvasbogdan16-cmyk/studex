@@ -299,7 +299,7 @@ function renderLead(lead) {
   const doc = card.querySelector(".lead__doc");
   if (lead.document_path) {
     doc.hidden = false;
-    doc.addEventListener("click", () => openDocument(lead.document_path));
+    doc.addEventListener("click", () => openDocument(lead, card));
   }
 
   const select = card.querySelector("select");
@@ -781,19 +781,47 @@ genForm.addEventListener("submit", async (e) => {
   }
 });
 
-// Оригінал лежить у закритому сховищі: відкриваємо за тимчасовим посиланням
-async function openDocument(path) {
-  const win = window.open("", "_blank"); // відкриваємо одразу, інакше браузер заблокує вікно
-  const { data, error } = await db.storage.from("scans").createSignedUrl(path, 300);
+// Оригінал лежить у закритому сховищі: показуємо за тимчасовим посиланням поруч із карткою
+const docDialog = document.getElementById("doc-dialog");
+let highlightedCard = null;
+
+async function openDocument(lead, card) {
+  const { data, error } = await db.storage.from("scans").createSignedUrl(lead.document_path, 300);
   if (error || !data) {
     console.error(error);
-    if (win) win.close();
     notify("Не вдалося відкрити оригінал", true);
     return;
   }
-  if (win) win.location.href = data.signedUrl;
-  else window.location.href = data.signedUrl;
+
+  const body = document.getElementById("doc-body");
+  if (/\.pdf$/i.test(lead.document_path)) {
+    const frame = document.createElement("iframe");
+    frame.src = data.signedUrl;
+    frame.title = "Оригінал візитки (PDF)";
+    body.replaceChildren(frame);
+  } else {
+    const img = new Image();
+    img.src = data.signedUrl;
+    img.alt = `Оригінал візитки: ${lead.name}`;
+    body.replaceChildren(img);
+  }
+  document.getElementById("doc-who").textContent = [lead.name, lead.job_title, lead.company].filter(Boolean).join(" · ");
+  document.getElementById("doc-open").href = data.signedUrl;
+
+  if (highlightedCard) highlightedCard.classList.remove("is-highlighted");
+  highlightedCard = card;
+  card.classList.add("is-highlighted");
+  docDialog.showModal();
 }
+
+document.getElementById("doc-close").addEventListener("click", () => docDialog.close());
+docDialog.addEventListener("click", (e) => {
+  if (e.target === docDialog) docDialog.close();
+});
+docDialog.addEventListener("close", () => {
+  if (highlightedCard) highlightedCard.classList.remove("is-highlighted");
+  highlightedCard = null;
+});
 
 // ----- Старт -----
 

@@ -228,6 +228,17 @@
     </form>
   </dialog>
 
+  <!-- Оригінал документа з картки -->
+  <dialog class="add-dialog doc-dialog" id="doc-dialog" aria-labelledby="doc-title">
+    <div class="add-dialog__head">
+      <h2 class="add-dialog__title" id="doc-title">Оригінал візитки</h2>
+      <button type="button" class="add-dialog__close" id="doc-close" aria-label="Закрити">×</button>
+    </div>
+    <p class="doc-dialog__who" id="doc-who"></p>
+    <div class="doc-dialog__body" id="doc-body"></div>
+    <a class="btn btn--ghost btn--sm" id="doc-open" target="_blank" rel="noopener">Відкрити в новій вкладці</a>
+  </dialog>
+
   <template id="column-template">
     <section class="column">
       <header class="column__head">
