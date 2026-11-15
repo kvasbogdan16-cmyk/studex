@@ -26,7 +26,7 @@ const addError = document.getElementById("add-error");
 const addSubmit = document.getElementById("add-submit");
 const addStage = document.getElementById("add-stage");
 
-const LEAD_FIELDS = "id, created_at, name, phone, comment, source, stage_id";
+const LEAD_FIELDS = "id, created_at, name, phone, comment, source, stage_id, company, job_title, email, document_path";
 const HISTORY_FIELDS = "id, lead_id, from_stage_id, to_stage_id, changed_at";
 
 const dateFormat = new Intl.DateTimeFormat("uk-UA", {
@@ -257,11 +257,26 @@ function renderLead(lead) {
   time.dateTime = lead.created_at;
   time.textContent = dateFormat.format(new Date(lead.created_at));
 
+  card.querySelector(".lead__company").textContent = [lead.job_title, lead.company].filter(Boolean).join(" · ");
+
   const phone = card.querySelector(".lead__phone");
   phone.textContent = lead.phone;
   phone.href = "tel:" + lead.phone.replace(/[^\d+]/g, "");
 
+  const email = card.querySelector(".lead__email");
+  if (lead.email) {
+    email.textContent = lead.email;
+    email.href = "mailto:" + lead.email;
+    email.hidden = false;
+  }
+
   card.querySelector(".lead__comment").textContent = lead.comment || "";
+
+  const doc = card.querySelector(".lead__doc");
+  if (lead.document_path) {
+    doc.hidden = false;
+    doc.addEventListener("click", () => openDocument(lead.document_path));
+  }
 
   const select = card.querySelector("select");
   fillStageSelect(select, lead.stage_id);
@@ -356,7 +371,7 @@ function validateClient(form) {
       phone,
       comment: comment || null,
       source: "Вручну",
-      stage_id: Number(form.elements.stage.value),
+      stage_id: form.elements.stage ? Number(form.elements.stage.value) : stages[0].id,
     },
   };
 }
@@ -407,6 +422,222 @@ addForm.addEventListener("submit", async (e) => {
 });
 
 document.getElementById("refresh").addEventListener("click", loadBoard);
+
+// ----- Візитка: розпізнавання через Claude -----
+
+const MAX_ORIGINAL_BYTES = 15 * 1024 * 1024; // ліміт сховища scans
+const MAX_PDF_BYTES = 3 * 1024 * 1024; // PDF іде в Claude як є
+const CLAUDE_IMAGE_SIDE = 1600; // фото для Claude зменшуємо: швидше і дешевше, текст лишається чітким
+
+const scanDialog = document.getElementById("scan-dialog");
+const scanFile = document.getElementById("scan-file");
+const scanPreview = document.getElementById("scan-preview");
+const scanLoading = document.getElementById("scan-loading");
+const scanFail = document.getElementById("scan-fail");
+const scanFailText = document.getElementById("scan-fail-text");
+const scanForm = document.getElementById("scan-form");
+const scanError = document.getElementById("scan-error");
+const scanSubmit = document.getElementById("scan-submit");
+
+let scanOriginal = null; // файл, який обрав адмін (зберігаємо як оригінал)
+let scanRun = 0; // щоб відповідь старого розпізнавання не перезаписала нове
+let previewUrl = null;
+
+function setScanState(state, message = "") {
+  scanLoading.hidden = state !== "loading";
+  scanFail.hidden = state !== "fail";
+  scanForm.hidden = state !== "review";
+  scanFailText.textContent = message;
+}
+
+function showPreview(file) {
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl = null;
+  if (file.type.startsWith("image/")) {
+    previewUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.src = previewUrl;
+    img.alt = "Фото візитки";
+    scanPreview.replaceChildren(img);
+  } else {
+    const p = document.createElement("p");
+    p.className = "scan-preview__file";
+    p.textContent = "📄 " + file.name;
+    scanPreview.replaceChildren(p);
+  }
+}
+
+function fileToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Готує файл для Claude: фото зменшує до JPEG, PDF надсилає як є
+async function prepareForClaude(file) {
+  if (file.type === "application/pdf") {
+    if (file.size > MAX_PDF_BYTES) throw new Error("PDF завеликий: до 3 МБ. Сфотографуй візитку або зменш файл.");
+    return { mediaType: "application/pdf", data: await fileToBase64(file) };
+  }
+
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    throw new Error("Не вдалося відкрити це фото в браузері. Збережи його як JPEG або PNG і спробуй ще раз.");
+  }
+  const scale = Math.min(1, CLAUDE_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+  return { mediaType: "image/jpeg", data: await fileToBase64(blob) };
+}
+
+async function recognizeCard(file) {
+  const run = ++scanRun;
+  scanOriginal = file;
+  showPreview(file);
+  setScanState("loading");
+  if (!scanDialog.open) scanDialog.showModal();
+
+  try {
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      throw new Error("Підтримуються фото і PDF.");
+    }
+    if (file.size > MAX_ORIGINAL_BYTES) throw new Error("Файл завеликий: до 15 МБ.");
+
+    const payload = await prepareForClaude(file);
+    const { data: auth } = await db.auth.getSession();
+    if (!auth.session) throw new Error("Сесія закінчилась. Увійди в адмін-панель ще раз.");
+
+    const res = await fetch("/api/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.session.access_token}` },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (run !== scanRun) return;
+    if (!res.ok) throw new Error(body.error || "Не вдалося розпізнати візитку. Спробуй ще раз.");
+
+    fillScanForm(body.card);
+    setScanState("review");
+    scanForm.elements.name.focus();
+  } catch (err) {
+    if (run !== scanRun) return;
+    console.error(err);
+    scanOriginal = null; // нічого не зберігаємо
+    setScanState("fail", err.message || "Не вдалося розпізнати візитку.");
+  }
+}
+
+function fillScanForm(card) {
+  scanForm.reset();
+  scanError.textContent = "";
+  const f = scanForm.elements;
+  f.name.value = card.name || card.company || "";
+  f.company.value = card.company || "";
+  f.job_title.value = card.job_title || "";
+  f.phone.value = card.phone || "";
+  f.email.value = card.email || "";
+  f.comment.value = [card.notes, card.reason].filter(Boolean).join("\n");
+}
+
+function documentPath(file) {
+  const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "application/pdf": "pdf" }[file.type] || "bin";
+  const month = new Date().toISOString().slice(0, 7);
+  return `cards/${month}/${crypto.randomUUID()}.${ext}`;
+}
+
+document.getElementById("scan-open").addEventListener("click", () => scanFile.click());
+document.getElementById("scan-retry").addEventListener("click", () => scanFile.click());
+document.getElementById("scan-close").addEventListener("click", () => scanDialog.close());
+
+scanDialog.addEventListener("close", () => {
+  scanRun++; // відповідь, що запізнилась, уже не покажемо
+  scanOriginal = null;
+});
+
+scanFile.addEventListener("change", () => {
+  const file = scanFile.files[0];
+  scanFile.value = ""; // щоб той самий файл можна було обрати ще раз
+  if (file) recognizeCard(file);
+});
+
+scanForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!scanOriginal) return;
+
+  const { client, error, field } = validateClient(scanForm);
+  if (error) {
+    scanError.textContent = error;
+    scanForm.elements[field].focus();
+    return;
+  }
+  const f = scanForm.elements;
+  const email = f.email.value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    scanError.textContent = "Перевір email.";
+    f.email.focus();
+    return;
+  }
+
+  scanSubmit.disabled = true;
+  scanSubmit.textContent = "Зберігаємо…";
+  scanError.textContent = "";
+
+  try {
+    const path = documentPath(scanOriginal);
+    const upload = await db.storage.from("scans").upload(path, scanOriginal, { contentType: scanOriginal.type });
+    if (upload.error) throw upload.error;
+
+    const { data, error: dbError } = await db
+      .from("leads")
+      .insert({
+        ...client,
+        source: "Візитка",
+        stage_id: stages[0].id,
+        company: f.company.value.trim() || null,
+        job_title: f.job_title.value.trim() || null,
+        email: email || null,
+        document_path: path,
+      })
+      .select(LEAD_FIELDS)
+      .single();
+    if (dbError) throw dbError;
+
+    leads.unshift(data);
+    await reloadHistory(data.id);
+    scanDialog.close();
+    render();
+    notify(`«${data.name}» додано з візитки`);
+  } catch (err) {
+    console.error(err);
+    scanError.textContent = "Не вдалося зберегти. Спробуй ще раз.";
+  } finally {
+    scanSubmit.disabled = false;
+    scanSubmit.textContent = "Зберегти у воронку";
+  }
+});
+
+// Оригінал лежить у закритому сховищі: відкриваємо за тимчасовим посиланням
+async function openDocument(path) {
+  const win = window.open("", "_blank"); // відкриваємо одразу, інакше браузер заблокує вікно
+  const { data, error } = await db.storage.from("scans").createSignedUrl(path, 300);
+  if (error || !data) {
+    console.error(error);
+    if (win) win.close();
+    notify("Не вдалося відкрити оригінал", true);
+    return;
+  }
+  if (win) win.location.href = data.signedUrl;
+  else window.location.href = data.signedUrl;
+}
 
 // ----- Старт -----
 

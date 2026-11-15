@@ -67,7 +67,9 @@
         </div>
         <div class="admin-leads__actions">
           <button class="btn btn--ghost btn--sm" id="refresh" aria-label="Оновити воронку">↻ Оновити</button>
+          <button class="btn btn--ghost btn--sm" id="scan-open">📷 Сканувати візитку</button>
           <button class="btn btn--primary btn--sm" id="add-open">+ Додати клієнта</button>
+          <input type="file" id="scan-file" accept="image/*,application/pdf" hidden>
         </div>
       </div>
 
@@ -106,6 +108,60 @@
     </form>
   </dialog>
 
+  <!-- Візитка: розпізнавання і перевірка -->
+  <dialog class="add-dialog scan-dialog" id="scan-dialog" aria-labelledby="scan-title">
+    <div class="add-dialog__head">
+      <h2 class="add-dialog__title" id="scan-title">Візитка</h2>
+      <button type="button" class="add-dialog__close" id="scan-close" aria-label="Закрити">×</button>
+    </div>
+
+    <div class="scan-preview" id="scan-preview"></div>
+
+    <div class="scan-loading" id="scan-loading">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>Розпізнаємо візитку… Це займає 5–20 секунд.</span>
+    </div>
+
+    <div class="scan-fail" id="scan-fail" hidden>
+      <p class="apply__error" id="scan-fail-text" role="alert"></p>
+      <button type="button" class="btn btn--primary apply__submit" id="scan-retry">Обрати інше фото</button>
+    </div>
+
+    <form class="apply__form" id="scan-form" novalidate hidden>
+      <p class="scan-hint">Перевір, що розпізналось, і виправ, якщо треба. Клієнт з'явиться на першому етапі з джерелом «Візитка».</p>
+      <div class="field">
+        <label for="scan-name">Ім'я</label>
+        <input id="scan-name" name="name" type="text" autocomplete="off" required minlength="2" maxlength="100">
+      </div>
+      <div class="scan-row">
+        <div class="field">
+          <label for="scan-company">Компанія</label>
+          <input id="scan-company" name="company" type="text" autocomplete="off" maxlength="150">
+        </div>
+        <div class="field">
+          <label for="scan-job">Посада</label>
+          <input id="scan-job" name="job_title" type="text" autocomplete="off" maxlength="150">
+        </div>
+      </div>
+      <div class="scan-row">
+        <div class="field">
+          <label for="scan-phone">Телефон</label>
+          <input id="scan-phone" name="phone" type="tel" inputmode="tel" autocomplete="off" required maxlength="30">
+        </div>
+        <div class="field">
+          <label for="scan-email">Email</label>
+          <input id="scan-email" name="email" type="email" autocomplete="off" maxlength="200">
+        </div>
+      </div>
+      <div class="field">
+        <label for="scan-comment">Нотатки <span class="field__optional">(необов'язково)</span></label>
+        <textarea id="scan-comment" name="comment" rows="2" maxlength="1000"></textarea>
+      </div>
+      <p class="apply__error" id="scan-error" role="alert"></p>
+      <button type="submit" class="btn btn--primary apply__submit" id="scan-submit">Зберегти у воронку</button>
+    </form>
+  </dialog>
+
   <template id="column-template">
     <section class="column">
       <header class="column__head">
@@ -124,8 +180,11 @@
         <span class="lead__source"></span>
       </div>
       <time class="lead__date"></time>
+      <p class="lead__company"></p>
       <a class="lead__phone"></a>
+      <a class="lead__email" hidden></a>
       <p class="lead__comment"></p>
+      <button type="button" class="lead__doc" hidden>📎 Оригінал візитки</button>
       <label class="lead__status">
         <span class="visually-hidden">Етап</span>
         <select></select>
