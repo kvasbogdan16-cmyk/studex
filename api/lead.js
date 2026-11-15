@@ -1,4 +1,5 @@
 // POST /api/lead — зберігає заявку в Supabase і надсилає сповіщення в Telegram.
+// Джерело («Сайт») і перший етап воронки («Нова») заявці ставить сама база (supabase-crm.sql).
 // Усі ключі — у змінних середовища Vercel (Settings → Environment Variables):
 //   SUPABASE_URL              — адреса проєкту Supabase
 //   SUPABASE_PUBLISHABLE_KEY  — publishable-ключ Supabase (дозволяє лише додавати заявки)
@@ -74,7 +75,8 @@ function buildMessage(lead) {
     `📞 <b>Телефон:</b> ${escapeHtml(lead.phone)}`,
     `💬 <b>Коментар:</b> ${lead.comment ? escapeHtml(lead.comment) : "—"}`,
     `🕒 <b>Час:</b> ${date}`,
-    `📌 <b>Статус:</b> нова`,
+    `🌐 <b>Джерело:</b> Сайт`,
+    `📌 <b>Етап:</b> Нова`,
     "",
     `<a href="${ADMIN_URL}">Відкрити адмін-панель</a>`,
   ];

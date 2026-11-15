@@ -141,104 +141,162 @@
   font-size: 15px;
 }
 
-.admin-filters {
-  justify-content: flex-start;
-  margin-bottom: 20px;
+.admin-leads__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
-.filter__count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 22px;
-  height: 22px;
-  margin-left: 4px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--tint);
-  color: var(--ink-soft);
-  font-size: 12px;
+@media (max-width: 600px) {
+  .admin-leads__head { flex-direction: column; }
+  .admin-leads__actions { justify-content: flex-start; }
 }
 
-.filter.is-active .filter__count {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-}
+/* Воронка ширша за звичайний контейнер, щоб влізли всі етапи */
+.admin-leads { max-width: 1680px; }
 
 #leads-error { margin-bottom: 16px; }
 
-.leads {
+/* Кольори етапів: перший, проміжні, успіх, відмова */
+[data-kind="new"]      { --stage: var(--violet); --stage-bg: var(--violet-soft); --stage-ink: var(--violet); }
+[data-kind="progress"] { --stage: var(--yellow); --stage-bg: #fff3c4; --stage-ink: #7a5a00; }
+[data-kind="won"]      { --stage: #3fae2a; --stage-bg: var(--lime-soft); --stage-ink: #2d6b12; }
+[data-kind="lost"]     { --stage: var(--coral); --stage-bg: var(--coral-soft); --stage-ink: #b3281a; }
+
+.board {
   display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
   gap: 14px;
+  align-items: start;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scroll-snap-type: x proximity;
 }
 
-@media (min-width: 768px) {
-  .leads { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (min-width: 1100px) {
-  .leads { grid-template-columns: repeat(3, 1fr); }
-}
-
-.lead {
+.column {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 20px;
+  min-width: 0;
+  min-height: 160px;
+  padding: 12px;
+  background: var(--tint);
+  border: 2px solid transparent;
+  border-top: 4px solid var(--stage);
+  border-radius: var(--radius);
+  scroll-snap-align: start;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.column.is-drop {
+  border-color: var(--stage);
+  background: var(--stage-bg);
+}
+
+.column__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px;
+}
+
+.column__title {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.column__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--stage-bg);
+  color: var(--stage-ink);
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.column__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.column__empty {
+  padding: 20px 8px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.column__empty[hidden] { display: none; }
+
+/* Картка */
+.lead {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 5px solid var(--violet);
-  border-radius: var(--radius);
+  border-left: 4px solid var(--stage);
+  border-radius: var(--radius-sm);
+  cursor: grab;
   animation: pop 0.3s ease both;
 }
 
-.lead[data-status="в роботі"] { border-left-color: var(--yellow); }
-.lead[data-status="закрита"] { border-left-color: var(--border); }
-.lead[data-status="закрита"] .lead__name,
-.lead[data-status="закрита"] .lead__phone,
-.lead[data-status="закрита"] .lead__comment { opacity: 0.6; }
+.lead.is-dragging { opacity: 0.4; }
+
+.lead[data-kind="lost"] .lead__name,
+.lead[data-kind="lost"] .lead__phone,
+.lead[data-kind="lost"] .lead__comment { opacity: 0.65; }
 
 .lead__top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .lead__name {
+  min-width: 0;
   font-family: var(--font-body);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   word-break: break-word;
 }
 
+.lead__source {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+.lead__source[data-source="Вручну"] {
+  background: var(--ink);
+  color: #fff;
+}
+
 .lead__date {
-  display: block;
-  margin-top: 2px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
 }
-
-.lead__status select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding: 7px 30px 7px 12px;
-  border: 0;
-  border-radius: 999px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 800;
-  cursor: pointer;
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 10px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2315112b' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-}
-
-.lead[data-status="нова"] select { background-color: var(--violet-soft); color: var(--violet); }
-.lead[data-status="в роботі"] select { background-color: #fff3c4; color: #7a5a00; }
-.lead[data-status="закрита"] select { background-color: var(--tint); color: var(--muted); }
-
-.lead__status select:disabled { opacity: 0.6; cursor: wait; }
 
 .lead__phone {
   align-self: flex-start;
@@ -249,9 +307,7 @@
 .lead__phone:hover { text-decoration: underline; }
 
 .lead__comment {
-  padding-top: 10px;
-  border-top: 1px dashed var(--border);
-  font-size: 15px;
+  font-size: 14px;
   color: var(--ink-soft);
   white-space: pre-line;
   word-break: break-word;
@@ -259,17 +315,116 @@
 
 .lead__comment:empty { display: none; }
 
-.leads__empty {
-  padding: 48px 16px;
-  text-align: center;
-  color: var(--muted);
-  font-weight: 600;
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
+.lead__status select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 7px 30px 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  background-color: var(--stage-bg);
+  color: var(--stage-ink);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2315112b' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
-.leads__empty[hidden] { display: none; }
+.lead__status select:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+.lead__status select:disabled { opacity: 0.6; cursor: wait; }
+
+/* Історія переходів */
+.lead__history {
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+
+.lead__history summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.lead__history summary:hover { color: var(--violet); }
+
+.history {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 2px;
+  padding-left: 14px;
+  border-left: 2px solid var(--border);
+  list-style: none;
+}
+
+.history__item {
+  display: grid;
+  gap: 1px;
+  font-size: 13px;
+}
+
+.history__item time {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.history__item span { font-weight: 700; }
+
+/* Новий клієнт */
+.add-dialog {
+  width: min(460px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 24px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+}
+
+.add-dialog::backdrop { background: rgba(21, 17, 43, 0.45); }
+
+.add-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.add-dialog__title {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.add-dialog__close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--ink-soft);
+  background: var(--tint);
+}
+
+.add-dialog__close:hover { background: var(--violet-soft); color: var(--violet); }
+
+.add-dialog__select {
+  width: 100%;
+  padding: 13px 16px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.add-dialog__select:focus { outline: none; border-color: var(--violet); }
 
 /* Сповіщення */
 .toast {

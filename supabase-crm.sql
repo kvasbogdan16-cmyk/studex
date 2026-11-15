@@ -122,14 +122,25 @@ insert into public.lead_history (lead_id, from_stage_id, to_stage_id, changed_at
 select id, null, stage_id, created_at
 from public.leads;
 
--- ----- 4. Права доступу -----
+-- ----- 4. Старий статус більше не потрібен: його замінив етап -----
 
--- Сайт: як і раніше, лише додає заявки, тепер тільки з джерелом «Сайт».
--- Етап сайт задати не може — його ставить база (перший етап).
 drop policy "Сайт може додавати нові заявки" on public.leads;
+drop policy "Адмін змінює статус" on public.leads;
+alter table public.leads drop column status;
+drop type public.lead_status;
+
+-- ----- 5. Права доступу -----
+
+-- Сайт: як і раніше, лише додає заявки (ім'я, телефон, коментар).
+-- Джерело завжди «Сайт», етап ставить база — сайт не може задати їх сам.
 create policy "Сайт може додавати нові заявки"
   on public.leads for insert to anon
-  with check (status = 'нова' and source = 'Сайт');
+  with check (source = 'Сайт');
+
+create policy "Адмін змінює етап"
+  on public.leads for update to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- Адмін: бачить етапи
 alter table public.lead_stages enable row level security;

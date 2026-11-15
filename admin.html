@@ -58,49 +58,82 @@
       </div>
     </section>
 
-    <!-- Заявки -->
+    <!-- Воронка -->
     <section class="container admin-leads" id="view-leads" hidden>
       <div class="admin-leads__head">
         <div>
-          <h1 class="admin-leads__title">Заявки</h1>
-          <p class="admin-leads__sub">Нові зверху. Статус змінюється одразу.</p>
+          <h1 class="admin-leads__title">Воронка</h1>
+          <p class="admin-leads__sub" id="leads-summary">Заявки з сайту потрапляють у першу колонку. Перетягни картку або обери етап на ній.</p>
         </div>
-        <button class="btn btn--ghost btn--sm" id="refresh" aria-label="Оновити список">↻ Оновити</button>
-      </div>
-
-      <div class="filters admin-filters" role="tablist" aria-label="Фільтр за статусом" id="status-filters">
-        <button class="filter is-active" data-status="all" role="tab" aria-selected="true">Усі <span class="filter__count" data-count="all">0</span></button>
-        <button class="filter" data-status="нова" role="tab" aria-selected="false">Нові <span class="filter__count" data-count="нова">0</span></button>
-        <button class="filter" data-status="в роботі" role="tab" aria-selected="false">В роботі <span class="filter__count" data-count="в роботі">0</span></button>
-        <button class="filter" data-status="закрита" role="tab" aria-selected="false">Закриті <span class="filter__count" data-count="закрита">0</span></button>
+        <div class="admin-leads__actions">
+          <button class="btn btn--ghost btn--sm" id="refresh" aria-label="Оновити воронку">↻ Оновити</button>
+          <button class="btn btn--primary btn--sm" id="add-open">+ Додати клієнта</button>
+        </div>
       </div>
 
       <p class="apply__error" id="leads-error" role="alert"></p>
-      <div class="leads" id="leads-list" aria-live="polite"></div>
-      <p class="leads__empty" id="leads-empty" hidden>Тут поки порожньо.</p>
+      <div class="board" id="board" aria-live="polite"></div>
     </section>
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+  <!-- Новий клієнт -->
+  <dialog class="add-dialog" id="add-dialog" aria-labelledby="add-title">
+    <form class="apply__form" id="add-form" novalidate>
+      <div class="add-dialog__head">
+        <h2 class="add-dialog__title" id="add-title">Новий клієнт</h2>
+        <button type="button" class="add-dialog__close" id="add-close" aria-label="Закрити">×</button>
+      </div>
+      <div class="field">
+        <label for="add-name">Ім'я</label>
+        <input id="add-name" name="name" type="text" autocomplete="off" required minlength="2" maxlength="100">
+      </div>
+      <div class="field">
+        <label for="add-phone">Телефон</label>
+        <input id="add-phone" name="phone" type="tel" inputmode="tel" autocomplete="off" placeholder="+380 XX XXX XX XX" required maxlength="30">
+      </div>
+      <div class="field">
+        <label for="add-comment">Коментар <span class="field__optional">(необов'язково)</span></label>
+        <textarea id="add-comment" name="comment" rows="3" maxlength="1000" placeholder="Звідки дізнався, що шукає"></textarea>
+      </div>
+      <div class="field">
+        <label for="add-stage">Етап</label>
+        <select id="add-stage" name="stage" class="add-dialog__select"></select>
+      </div>
+      <p class="apply__error" id="add-error" role="alert"></p>
+      <button type="submit" class="btn btn--primary apply__submit" id="add-submit">Додати у воронку</button>
+    </form>
+  </dialog>
+
+  <template id="column-template">
+    <section class="column">
+      <header class="column__head">
+        <h2 class="column__title"></h2>
+        <span class="column__count">0</span>
+      </header>
+      <div class="column__list"></div>
+      <p class="column__empty">Порожньо</p>
+    </section>
+  </template>
+
   <template id="lead-template">
     <article class="lead">
       <div class="lead__top">
-        <div>
-          <h2 class="lead__name"></h2>
-          <time class="lead__date"></time>
-        </div>
-        <label class="lead__status">
-          <span class="visually-hidden">Статус заявки</span>
-          <select>
-            <option value="нова">Нова</option>
-            <option value="в роботі">В роботі</option>
-            <option value="закрита">Закрита</option>
-          </select>
-        </label>
+        <h3 class="lead__name"></h3>
+        <span class="lead__source"></span>
       </div>
+      <time class="lead__date"></time>
       <a class="lead__phone"></a>
       <p class="lead__comment"></p>
+      <label class="lead__status">
+        <span class="visually-hidden">Етап</span>
+        <select></select>
+      </label>
+      <details class="lead__history">
+        <summary></summary>
+        <ol class="history"></ol>
+      </details>
     </article>
   </template>
 
