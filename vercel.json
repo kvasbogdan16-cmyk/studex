@@ -1,7 +1,8 @@
 {
   "cleanUrls": true,
   "functions": {
-    "api/scan.js": { "maxDuration": 60 }
+    "api/scan.js": { "maxDuration": 60 },
+    "api/generate.js": { "maxDuration": 60 }
   },
   "headers": [
     {

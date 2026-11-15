@@ -30,6 +30,14 @@
   </header>
 
   <main class="admin-main">
+    <!-- Розділи адмінки -->
+    <div class="container admin-nav-wrap" id="admin-nav" hidden>
+      <nav class="filters admin-nav" aria-label="Розділи адмінки">
+        <button class="filter is-active" type="button" data-view="leads" aria-current="page">Воронка</button>
+        <button class="filter" type="button" data-view="images">🎨 Картинки</button>
+      </nav>
+    </div>
+
     <!-- Завантаження -->
     <div class="container admin-loading" id="view-loading">
       <span class="spinner" aria-hidden="true"></span>
@@ -75,6 +83,64 @@
 
       <p class="apply__error" id="leads-error" role="alert"></p>
       <div class="board" id="board" aria-live="polite"></div>
+    </section>
+
+    <!-- Картинки для вакансій (GPT Image) -->
+    <section class="container admin-images" id="view-images" hidden>
+      <div class="admin-leads__head">
+        <div>
+          <h1 class="admin-leads__title">Картинки для вакансій</h1>
+          <p class="admin-leads__sub">Опиши, що має бути на картинці, і нейромережа GPT Image намалює її для поста чи картки вакансії. Ліміт — 5 картинок на день.</p>
+        </div>
+      </div>
+
+      <div class="gen">
+        <form class="apply__form gen__form" id="gen-form" novalidate>
+          <div class="field">
+            <label for="gen-prompt">Що зобразити</label>
+            <textarea id="gen-prompt" name="prompt" rows="4" maxlength="1000" placeholder="Студентка-бариста усміхається і готує каву в затишній кав'ярні, ранкове світло"></textarea>
+          </div>
+          <div class="scan-row">
+            <div class="field">
+              <label for="gen-style">Стиль</label>
+              <select id="gen-style" name="style" class="add-dialog__select">
+                <option value="photo">Фото</option>
+                <option value="illustration">Ілюстрація</option>
+                <option value="flat">Плоска графіка у фірмових кольорах</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="gen-format">Формат</label>
+              <select id="gen-format" name="format" class="add-dialog__select">
+                <option value="banner">Банер 3:2</option>
+                <option value="post">Пост 1:1</option>
+                <option value="story">Сторіс 2:3</option>
+              </select>
+            </div>
+          </div>
+          <p class="gen__quota" id="gen-quota"></p>
+          <p class="apply__error" id="gen-error" role="alert"></p>
+          <button type="submit" class="btn btn--primary apply__submit" id="gen-submit">✨ Згенерувати</button>
+        </form>
+
+        <div class="gen__result" aria-live="polite">
+          <p class="gen__placeholder" id="gen-placeholder">Тут з'явиться картинка</p>
+          <div class="scan-loading" id="gen-loading" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Генеруємо… Зазвичай це 10–60 секунд.</span>
+          </div>
+          <figure class="gen__figure" id="gen-figure" hidden>
+            <img id="gen-image" alt="">
+            <figcaption id="gen-caption"></figcaption>
+            <a class="btn btn--ghost btn--sm" id="gen-open" target="_blank" rel="noopener">Відкрити в повному розмірі</a>
+          </figure>
+        </div>
+      </div>
+
+      <h2 class="gen__history-title">Історія генерацій</h2>
+      <p class="apply__error" id="gen-history-error" role="alert"></p>
+      <div class="gen__history" id="gen-history"></div>
+      <p class="gen__empty" id="gen-empty" hidden>Ще немає згенерованих картинок.</p>
     </section>
   </main>
 

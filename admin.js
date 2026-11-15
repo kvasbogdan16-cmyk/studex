@@ -6,7 +6,9 @@ const views = {
   loading: document.getElementById("view-loading"),
   login: document.getElementById("view-login"),
   leads: document.getElementById("view-leads"),
+  images: document.getElementById("view-images"),
 };
+const adminNav = document.getElementById("admin-nav");
 
 const userBox = document.getElementById("user-box");
 const userEmail = document.getElementById("user-email");
@@ -54,7 +56,21 @@ const openHistory = new Set(); // id карток із розгорнутою і
 
 function show(view) {
   Object.entries(views).forEach(([name, el]) => (el.hidden = name !== view));
+  adminNav.hidden = view !== "leads" && view !== "images";
+  adminNav.querySelectorAll("[data-view]").forEach((btn) => {
+    const active = btn.dataset.view === view;
+    btn.classList.toggle("is-active", active);
+    if (active) btn.setAttribute("aria-current", "page");
+    else btn.removeAttribute("aria-current");
+  });
 }
+
+adminNav.querySelectorAll("[data-view]").forEach((btn) =>
+  btn.addEventListener("click", () => {
+    show(btn.dataset.view);
+    if (btn.dataset.view === "images") loadImages();
+  })
+);
 
 let toastTimer;
 function notify(message, isError = false) {
@@ -630,6 +646,138 @@ scanForm.addEventListener("submit", async (e) => {
   } finally {
     scanSubmit.disabled = false;
     scanSubmit.textContent = "Зберегти у воронку";
+  }
+});
+
+// ----- Картинки для вакансій (GPT Image) -----
+
+const genForm = document.getElementById("gen-form");
+const genSubmit = document.getElementById("gen-submit");
+const genError = document.getElementById("gen-error");
+const genQuota = document.getElementById("gen-quota");
+const genPlaceholder = document.getElementById("gen-placeholder");
+const genLoading = document.getElementById("gen-loading");
+const genFigure = document.getElementById("gen-figure");
+const genHistory = document.getElementById("gen-history");
+const genEmpty = document.getElementById("gen-empty");
+const genHistoryError = document.getElementById("gen-history-error");
+
+const STYLE_LABELS = { photo: "Фото", illustration: "Ілюстрація", flat: "Плоска графіка" };
+const SIZE_LABELS = { "1536x1024": "Банер 3:2", "1024x1024": "Пост 1:1", "1024x1536": "Сторіс 2:3" };
+let generating = false;
+
+function showQuota(quota) {
+  if (!quota) return;
+  const left = Math.max(0, quota.day_limit - quota.used);
+  genQuota.textContent = left
+    ? `Сьогодні використано ${quota.used} з ${quota.day_limit}. Залишилось: ${left}.`
+    : `Ліміт на сьогодні вичерпано: ${quota.used} з ${quota.day_limit}. Нові генерації — завтра.`;
+  genQuota.classList.toggle("is-empty", !left);
+}
+
+async function loadQuota() {
+  const { data, error } = await db.rpc("generation_quota");
+  if (!error && data && data[0]) showQuota(data[0]);
+}
+
+async function signedUrls(paths) {
+  if (!paths.length) return {};
+  const { data, error } = await db.storage.from("generations").createSignedUrls(paths, 3600);
+  if (error || !data) return {};
+  return Object.fromEntries(data.filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
+}
+
+async function loadImages() {
+  genHistoryError.textContent = "";
+  loadQuota();
+  const { data, error } = await db
+    .from("generations")
+    .select("id, created_at, prompt, style, size, image_path")
+    .eq("status", "done")
+    .order("created_at", { ascending: false })
+    .limit(48);
+  if (error) {
+    console.error(error);
+    genHistoryError.textContent = "Не вдалося завантажити історію. Онови сторінку.";
+    return;
+  }
+  const urls = await signedUrls(data.map((g) => g.image_path));
+  genEmpty.hidden = data.length > 0;
+  genHistory.replaceChildren(
+    ...data.map((g) => {
+      const item = document.createElement("figure");
+      item.className = "gen-item";
+      const link = document.createElement("a");
+      link.href = urls[g.image_path] || "#";
+      link.target = "_blank";
+      link.rel = "noopener";
+      const img = document.createElement("img");
+      img.src = urls[g.image_path] || "";
+      img.alt = g.prompt;
+      img.loading = "lazy";
+      link.append(img);
+      const caption = document.createElement("figcaption");
+      const prompt = document.createElement("p");
+      prompt.className = "gen-item__prompt";
+      prompt.textContent = g.prompt;
+      const meta = document.createElement("p");
+      meta.className = "gen-item__meta";
+      meta.textContent = `${STYLE_LABELS[g.style] || g.style} · ${SIZE_LABELS[g.size] || g.size} · ${historyDateFormat.format(new Date(g.created_at))}`;
+      caption.append(prompt, meta);
+      item.append(link, caption);
+      return item;
+    })
+  );
+}
+
+genForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (generating) return;
+  const prompt = genForm.elements.prompt.value.trim();
+  if (prompt.length < 3) {
+    genError.textContent = "Опиши, що має бути на картинці (від 3 символів).";
+    genForm.elements.prompt.focus();
+    return;
+  }
+
+  generating = true;
+  genSubmit.disabled = true;
+  genSubmit.textContent = "Генеруємо…";
+  genError.textContent = "";
+  genPlaceholder.hidden = true;
+  genFigure.hidden = true;
+  genLoading.hidden = false;
+
+  try {
+    const { data: auth } = await db.auth.getSession();
+    if (!auth.session) throw new Error("Сесія закінчилась. Увійди в адмін-панель ще раз.");
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.session.access_token}` },
+      body: JSON.stringify({ prompt, style: genForm.elements.style.value, format: genForm.elements.format.value }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || "Не вдалося згенерувати картинку. Спробуй ще раз.");
+
+    const urls = await signedUrls([body.image_path]);
+    const url = urls[body.image_path];
+    document.getElementById("gen-image").src = url || "";
+    document.getElementById("gen-image").alt = prompt;
+    document.getElementById("gen-caption").textContent = prompt;
+    document.getElementById("gen-open").href = url || "#";
+    genFigure.hidden = false;
+    showQuota(body.quota);
+    loadImages();
+  } catch (err) {
+    console.error(err);
+    genError.textContent = err.message;
+    genPlaceholder.hidden = false;
+    loadQuota();
+  } finally {
+    generating = false;
+    genLoading.hidden = true;
+    genSubmit.disabled = false;
+    genSubmit.textContent = "✨ Згенерувати";
   }
 });
 
