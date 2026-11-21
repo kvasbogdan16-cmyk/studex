@@ -2,8 +2,12 @@
   "cleanUrls": true,
   "functions": {
     "api/scan.js": { "maxDuration": 60 },
-    "api/generate.js": { "maxDuration": 60 }
+    "api/generate.js": { "maxDuration": 60 },
+    "api/refusals-report.js": { "maxDuration": 60 }
   },
+  "crons": [
+    { "path": "/api/refusals-report", "schedule": "0 7 1 * *" }
+  ],
   "headers": [
     {
       "source": "/admin",

@@ -86,6 +86,14 @@ async function rpc(name, args) {
   return text ? JSON.parse(text) : null;
 }
 
+// Порівнює секрети за сталий час (через SHA-256, щоб довжина не мала значення)
+function sameSecret(given, expected) {
+  if (typeof given !== "string" || !expected) return false;
+  const a = crypto.createHash("sha256").update(given).digest();
+  const b = crypto.createHash("sha256").update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 function parseBody(req) {
   let body = req.body || {};
   if (typeof body === "string") {
@@ -104,4 +112,4 @@ function sendError(res, err) {
   return res.status(500).json({ error: "Щось пішло не так. Спробуй ще раз." });
 }
 
-module.exports = { env, HttpError, verifyInitData, displayName, rpc, parseBody, sendError };
+module.exports = { env, HttpError, verifyInitData, displayName, rpc, sameSecret, parseBody, sendError };

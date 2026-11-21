@@ -1,8 +1,7 @@
 // POST /api/tg-setup — один раз налаштовує бота: кнопка меню відкриває Mini App, опис бота.
 // Захищено секретом TG_SERVER_SECRET (заголовок X-Setup-Secret), тож викликати може лише власник.
 
-const crypto = require("crypto");
-const { env } = require("./_telegram");
+const { env, sameSecret } = require("./_telegram");
 
 async function bot(method, payload) {
   const res = await fetch(`https://api.telegram.org/bot${env("TELEGRAM_BOT_TOKEN")}/${method}`, {
@@ -13,13 +12,6 @@ async function bot(method, payload) {
   const data = await res.json();
   if (!data.ok) throw new Error(`${method}: ${data.description}`);
   return data.result;
-}
-
-function sameSecret(given, expected) {
-  if (typeof given !== "string" || !expected) return false;
-  const a = crypto.createHash("sha256").update(given).digest();
-  const b = crypto.createHash("sha256").update(expected).digest();
-  return crypto.timingSafeEqual(a, b);
 }
 
 module.exports = async function handler(req, res) {
