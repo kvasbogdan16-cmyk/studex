@@ -4,7 +4,8 @@
     "api/scan.js": { "maxDuration": 60 },
     "api/generate.js": { "maxDuration": 60 },
     "api/refusals-report.js": { "maxDuration": 60 },
-    "api/refusals-bot.js": { "maxDuration": 60 }
+    "api/refusals-bot.js": { "maxDuration": 60 },
+    "api/refusals-sheet-sync.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/refusals-report", "schedule": "0 7 * * *" }

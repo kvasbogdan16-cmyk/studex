@@ -9,6 +9,7 @@ const {
   periodFor, fetchPeriod, recentCities, reportMessages,
   cityFitsButtons, cityTitle, cityKeyboard, cityPromptText, periodKeyboard, periodPromptText, parseCallback,
 } = require("./_refusals");
+const { sheetSaveRefusal, sheetDeleteRefusal } = require("./_sheets");
 
 // «/report@studex_bot Київ» → { command: "report", args: "Київ" }
 function parseCommand(text) {
@@ -88,6 +89,7 @@ async function handleUndo(msg) {
     p_author_id: msg.from.id,
   });
   if (deleted) {
+    await sheetDeleteRefusal(msg.chat.id, target.message_id);
     await react(msg.chat.id, target.message_id, null);
     await reply(msg, "Готово: цю відмову прибрано зі звітів.");
   } else {
@@ -102,7 +104,10 @@ async function handleRefusal(msg, edited) {
     // Повідомлення відредагували так, що відмови в ньому більше немає
     if (edited) {
       const deleted = await rpc("refusals_delete", { p_chat_id: msg.chat.id, p_message_id: msg.message_id, p_author_id: null });
-      if (deleted) await react(msg.chat.id, msg.message_id, null);
+      if (deleted) {
+        await sheetDeleteRefusal(msg.chat.id, msg.message_id);
+        await react(msg.chat.id, msg.message_id, null);
+      }
     }
     return;
   }
@@ -116,18 +121,20 @@ async function handleRefusal(msg, edited) {
     return;
   }
 
-  await rpc("refusals_save", {
-    p_chat_id: msg.chat.id,
-    p_message_id: msg.message_id,
-    p_city: parsed.city,
-    p_reason: parsed.reason,
-    p_person: parsed.person,
-    p_phone: parsed.phone,
-    p_comment: parsed.comment,
-    p_author_id: msg.from.id,
-    p_author_name: displayName(msg.from),
-    p_created_at: new Date(msg.date * 1000).toISOString(),
-  });
+  const row = {
+    chat_id: msg.chat.id,
+    message_id: msg.message_id,
+    city: parsed.city,
+    reason: parsed.reason,
+    person: parsed.person,
+    phone: parsed.phone,
+    comment: parsed.comment,
+    author_id: msg.from.id,
+    author_name: displayName(msg.from),
+    created_at: new Date(msg.date * 1000).toISOString(),
+  };
+  await rpc("refusals_save", Object.fromEntries(Object.entries(row).map(([k, v]) => [`p_${k}`, v])));
+  await sheetSaveRefusal(row);
   await react(msg.chat.id, msg.message_id, "👍");
 }
 
