@@ -20,9 +20,10 @@ module.exports = async function handler(req, res) {
     await tg("setWebhook", {
       url,
       secret_token: webhookSecret(),
-      allowed_updates: ["message", "edited_message"],
+      allowed_updates: ["message", "edited_message", "callback_query"],
     });
     const commands = [
+      { command: "report", description: "Звіт по відмовах: місто і період" },
       { command: "help", description: "Шаблон відмови і як працює бот" },
       { command: "undo", description: "Прибрати відмову зі звітів (у відповідь на неї)" },
     ];
@@ -38,7 +39,7 @@ module.exports = async function handler(req, res) {
       warnings.push("REFUSALS_CHAT_ID не задано: напиши /help у групі, бот покаже ID чату.");
     }
     if (!env("CRON_SECRET")) {
-      warnings.push("CRON_SECRET не задано: без нього щомісячний звіт не запуститься.");
+      warnings.push("CRON_SECRET не задано: без нього автоматичні звіти (щотижня й щомісяця) не запустяться.");
     }
     return res.status(200).json({ ok: true, bot: "@" + me.username, webhook: url, warnings });
   } catch (err) {

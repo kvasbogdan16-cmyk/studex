@@ -1,12 +1,16 @@
-// Чат відмов: розбір повідомлень, бот, побудова щомісячних звітів.
+// Чат відмов: розбір повідомлень, бот, періоди, звіти й кнопки для /report.
 // Файл із «_» на початку Vercel не публікує як окрему функцію.
 
 const crypto = require("crypto");
-const { env } = require("./_telegram");
+const { env, rpc } = require("./_telegram");
 
 const TZ = "Europe/Kyiv";
 const LVIV = "Львів";
+const ALL_CITIES = "*";
 const MAX_MESSAGE = 4000; // ліміт Telegram — 4096 символів, лишаємо запас
+const MAX_CALLBACK = 64; // ліміт Telegram на callback_data, у байтах
+const RECENT_DAYS = 90; // з яких днів брати міста для кнопок
+const CITY_BUTTONS = 8;
 
 // ---------- Бот ----------
 
@@ -36,7 +40,8 @@ function webhookSecret() {
 const FIELDS = {
   city: ["місто", "город", "city"],
   reason: ["причина", "reason"],
-  person: ["ім'я", "имя", "кандидат", "клієнт", "хто"],
+  person: ["ім'я", "имя", "піб", "кандидат", "клієнт", "хто"],
+  phone: ["телефон", "тел", "тел.", "номер", "номер телефону", "моб", "мобільний", "phone"],
   comment: ["коментар", "комментарий", "примітка", "деталі"],
 };
 
@@ -48,14 +53,19 @@ const CITY_ALIASES = {
   "дніпро": "Дніпро", "днепр": "Дніпро", "dnipro": "Дніпро",
 };
 
-const LIMITS = { city: 60, reason: 200, person: 100, comment: 1000 };
+const LIMITS = { city: 60, reason: 200, person: 100, phone: 30, comment: 1000 };
 
 function unifyApostrophes(s) {
   return s.replace(/[ʼ’`´]/g, "'");
 }
 
+// Ключ для порівняння назв без урахування регістру й виду апострофа
+function keyOf(s) {
+  return unifyApostrophes(String(s || "").toLowerCase());
+}
+
 function fieldOf(label) {
-  const key = unifyApostrophes(label.trim().toLowerCase());
+  const key = keyOf(label.trim());
   for (const [field, names] of Object.entries(FIELDS)) {
     if (names.includes(key)) return field;
   }
@@ -76,7 +86,7 @@ function normalizeCity(raw) {
     .replace(/\s+/g, " ")
     .trim();
   if (!s) return "";
-  const key = unifyApostrophes(s.toLowerCase());
+  const key = keyOf(s);
   if (CITY_ALIASES[key]) return CITY_ALIASES[key];
   // «івано-франківськ» → «Івано-Франківськ»
   return s.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_, p, c) => p + c.toUpperCase()).slice(0, LIMITS.city);
@@ -90,10 +100,21 @@ function normalizeReason(raw) {
   return capitalize(normalizeText(raw, LIMITS.reason).replace(/[.;]+$/u, ""));
 }
 
-// Повертає { isAttempt, city, reason, person, comment, missing: [] }.
+// «067 123 45 67» → «+380671234567». Від 10 до 13 цифр, як у формі заявки на сайті.
+function normalizePhone(raw) {
+  const s = normalizeText(raw, LIMITS.phone);
+  if (!s) return { phone: "", valid: true };
+  const digits = s.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 13) return { phone: s, valid: false };
+  if (digits.length === 10 && digits.startsWith("0")) return { phone: "+38" + digits, valid: true };
+  if (digits.length === 12 && digits.startsWith("380")) return { phone: "+" + digits, valid: true };
+  return { phone: (s.startsWith("+") ? "+" : "") + digits, valid: true };
+}
+
+// Повертає { isAttempt, city, reason, person, phone, comment, missing: [], invalid: [] }.
 // Відмовою вважається повідомлення з полем («Місто:», «Причина:»…) або хештегом #відмова.
 function parseRefusal(text) {
-  const out = { isAttempt: false, city: "", reason: "", person: "", comment: "", missing: [] };
+  const out = { isAttempt: false, city: "", reason: "", person: "", phone: "", comment: "", missing: [], invalid: [] };
   if (typeof text !== "string" || !text.trim()) return out;
 
   const extra = []; // рядки без мітки після «Коментар:» продовжують коментар
@@ -115,7 +136,7 @@ function parseRefusal(text) {
   const isTagged = tags.some((t) => ["відмова", "відмови", "отказ"].includes(t.toLowerCase()));
   if (isTagged) out.isAttempt = true;
   if (!out.city) {
-    const cityTag = tags.find((t) => !["відмова", "відмови", "отказ"].includes(t.toLowerCase()));
+    const cityTag = tags.find((t) => !["відмова", "відмови", "отказ"].includes(t.toLowerCase()) && /\p{L}/u.test(t));
     if (cityTag) out.city = cityTag;
   }
 
@@ -123,34 +144,42 @@ function parseRefusal(text) {
   out.reason = normalizeReason(out.reason);
   out.person = normalizeText(out.person, LIMITS.person);
   out.comment = normalizeText(out.comment, LIMITS.comment);
+  const phone = normalizePhone(out.phone);
+  out.phone = phone.phone;
 
   if (!out.city) out.missing.push("місто");
   if (!out.reason) out.missing.push("причину");
+  if (!phone.valid) out.invalid.push("номер телефону (має бути 10–13 цифр, напр. +380671234567)");
   return out;
 }
 
 const TEMPLATE =
   "Місто: Львів\n" +
-  "Причина: не влаштувала зарплата\n" +
+  "Причина: не влаштувала ціна\n" +
   "Ім'я: Олена Коваль\n" +
-  "Коментар: знайшла роботу ближче до дому";
+  "Телефон: +380671234567\n" +
+  "Коментар: знайшла дешевше";
 
 function helpText() {
   return (
-    "Я збираю відмови з цього чату й 1-го числа надсилаю звіт за минулий місяць " +
-    "(загальний і окремий детальний по Львову).\n\n" +
+    "Я збираю відмови з цього чату й надсилаю звіти: щопонеділка — за минулий тиждень, " +
+    "1-го числа — за минулий місяць (загальний і окремий детальний по Львову).\n\n" +
     "Напиши відмову окремим повідомленням за шаблоном:\n\n" +
     `<code>${escapeHtml(TEMPLATE)}</code>\n\n` +
     "Обов'язкові лише «Місто» і «Причина». Місто можна вказати й хештегом: #Львів.\n" +
     "Помилився — просто відредагуй повідомлення. Щоб прибрати відмову зі звітів, " +
-    "відповідай на неї командою /undo."
+    "відповідай на неї командою /undo.\n\n" +
+    "Звіт будь-коли: /report — обери місто й період кнопками. Або одразу: /report Київ"
   );
 }
 
-// ---------- Дати й місяці (за київським часом) ----------
+// ---------- Дати й періоди (за київським часом) ----------
 
 const MONTHS = ["січень", "лютий", "березень", "квітень", "травень", "червень",
   "липень", "серпень", "вересень", "жовтень", "листопад", "грудень"];
+const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
+
+const pad = (n) => String(n).padStart(2, "0");
 
 function kyivParts(date) {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -160,9 +189,39 @@ function kyivParts(date) {
   return { y: get("year"), m: get("month"), d: get("day"), hh: get("hour"), mm: get("minute") };
 }
 
-// { y, m } — місяць, за який звітуємо: попередній відносно «зараз» у Києві
+// Момент, коли в Києві настає 00:00 цього дня
+function kyivMidnight({ y, m, d }) {
+  const target = Date.UTC(y, m - 1, d);
+  let t = target;
+  for (let i = 0; i < 3; i++) {
+    const p = kyivParts(new Date(t));
+    const diff = target - Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm);
+    if (!diff) break;
+    t += diff;
+  }
+  return new Date(t);
+}
+
+function addDays({ y, m, d }, n) {
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
+}
+
+// Пн = 0 … Нд = 6
+function weekdayIndex({ y, m, d }) {
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
+}
+
+function mondayOf(day) {
+  return addDays(day, -weekdayIndex(day));
+}
+
 function previousMonth({ y, m }) {
   return m === 1 ? { y: y - 1, m: 12 } : { y, m: m - 1 };
+}
+
+function nextMonth({ y, m }) {
+  return m === 12 ? { y: y + 1, m: 1 } : { y, m: m + 1 };
 }
 
 function parseMonth(value) {
@@ -173,19 +232,91 @@ function parseMonth(value) {
   return m >= 1 && m <= 12 ? { y, m } : null;
 }
 
-function monthDate({ y, m }) {
-  return `${y}-${String(m).padStart(2, "0")}-01`;
+function parseDay(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || "");
+  if (!match) return null;
+  const day = { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
+  const check = addDays(day, 0);
+  return check.y === day.y && check.m === day.m && check.d === day.d ? day : null;
 }
 
 function monthName({ y, m }) {
   return `${MONTHS[m - 1]} ${y}`;
 }
 
-function daysInMonth({ y, m }) {
-  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+const fmtDay = ({ d, m }) => `${pad(d)}.${pad(m)}`;
+const sameDay = (a, b) => a.y === b.y && a.m === b.m && a.d === b.d;
+
+// Період звіту: [from, to) і попередній період для порівняння.
+// kind — "week" (з понеділка) або "month". Якщо now припадає на період, він «поки що»:
+// рахуємо до now, а порівнюємо з тими ж днями попереднього періоду.
+function makePeriod(kind, startDay, now) {
+  const start = kind === "month" ? { y: startDay.y, m: startDay.m, d: 1 } : mondayOf(startDay);
+  const endDay = kind === "month" ? { ...nextMonth(start), d: 1 } : addDays(start, 7);
+  const prevStart = kind === "month" ? { ...previousMonth(start), d: 1 } : addDays(start, -7);
+
+  const from = kyivMidnight(start);
+  const fullTo = kyivMidnight(endDay);
+  const partial = Boolean(now) && now > from && now < fullTo;
+  const to = partial ? now : fullTo;
+
+  const prevFrom = kyivMidnight(prevStart);
+  const prevTo = partial ? new Date(Math.min(prevFrom.getTime() + (to - from), from.getTime())) : from;
+
+  const lastDay = partial ? kyivParts(new Date(to.getTime() - 1)) : addDays(endDay, -1);
+  const asOf = partial ? ` — станом на ${fmtDay(lastDay)}` : "";
+
+  let title, prevShort;
+  if (kind === "month") {
+    title = monthName(start) + asOf;
+    prevShort = MONTHS[prevStart.m - 1];
+  } else {
+    title = `тиждень ${fmtDay(start)}–${fmtDay(addDays(endDay, -1))}${asOf}`;
+    prevShort = "попер. тиждень";
+  }
+  const prevLabel = kind === "month"
+    ? `${MONTHS[prevStart.m - 1]}${partial ? " за ті ж дні" : ""}`
+    : `попередній тиждень${partial ? " за ті ж дні" : ""}`;
+
+  return { kind, start, lastDay: { y: lastDay.y, m: lastDay.m, d: lastDay.d }, from, to, prevFrom, prevTo, partial, title, prevLabel, prevShort };
 }
 
-const pad = (n) => String(n).padStart(2, "0");
+const PERIODS = {
+  tw: "Цей тиждень",
+  tm: "Цей місяць",
+  lw: "Минулий тиждень",
+  lm: "Минулий місяць",
+};
+
+function periodFor(code, now = new Date()) {
+  const p = kyivParts(now);
+  const today = { y: p.y, m: p.m, d: p.d };
+  switch (code) {
+    case "tw": return makePeriod("week", today, now);
+    case "lw": return makePeriod("week", addDays(mondayOf(today), -7));
+    case "tm": return makePeriod("month", today, now);
+    case "lm": return makePeriod("month", { ...previousMonth(today), d: 1 });
+    default: return null;
+  }
+}
+
+// ---------- Дані ----------
+
+async function fetchRange(from, to) {
+  return (await rpc("refusals_range", { p_from: from.toISOString(), p_to: to.toISOString() })) || [];
+}
+
+async function fetchPeriod(period) {
+  const [rows, prevRows] = await Promise.all([fetchRange(period.from, period.to), fetchRange(period.prevFrom, period.prevTo)]);
+  return { rows, prevRows };
+}
+
+// Міста з відмовами за останні RECENT_DAYS днів — для кнопок, найчастіші першими
+async function recentCities(now = new Date()) {
+  const p = kyivParts(now);
+  const rows = await fetchRange(kyivMidnight(addDays({ y: p.y, m: p.m, d: p.d }, -RECENT_DAYS)), now);
+  return sorted(countBy(rows, (r) => r.city)).map(([, item]) => item);
+}
 
 // ---------- Звіти ----------
 
@@ -198,7 +329,7 @@ function countBy(rows, valueOf) {
   const map = new Map();
   for (const row of rows) {
     const label = valueOf(row) || "—";
-    const key = unifyApostrophes(label.toLowerCase());
+    const key = keyOf(label);
     const item = map.get(key) || { label, count: 0 };
     item.count += 1;
     map.set(key, item);
@@ -222,8 +353,8 @@ function delta(cur, prev) {
   return `${sign}${Math.abs(diff)}${pct}`;
 }
 
-function totalLine(cur, prev, prevMonth) {
-  return `Усього: <b>${cur}</b> · ${MONTHS[prevMonth.m - 1]}: ${prev} → ${delta(cur, prev)}`;
+function totalLine(cur, prev, period) {
+  return `Усього: <b>${cur}</b> · ${period.prevLabel}: ${prev} → ${delta(cur, prev)}`;
 }
 
 function messageLink(row) {
@@ -232,14 +363,14 @@ function messageLink(row) {
   return id.startsWith("-100") ? `https://t.me/c/${id.slice(4)}/${row.message_id}` : "";
 }
 
-function isLviv(row) {
-  return row.city === LVIV;
+function isCity(row, city) {
+  return keyOf(row.city) === keyOf(city);
 }
 
-function buildGeneralReport(rows, prevRows, month, prevMonth) {
-  const lines = [`📊 <b>Відмови за ${monthName(month)}</b>`, "", totalLine(rows.length, prevRows.length, prevMonth)];
+function buildGeneralReport(rows, prevRows, period) {
+  const lines = [`📊 <b>Відмови — ${period.title}</b>`, "", totalLine(rows.length, prevRows.length, period)];
   if (!rows.length) {
-    lines.push("", "За цей місяць відмов у чаті не було.");
+    lines.push("", "За цей період відмов у чаті не було.");
     return lines;
   }
 
@@ -251,7 +382,7 @@ function buildGeneralReport(rows, prevRows, month, prevMonth) {
   lines.push("", "<b>По містах</b>");
   for (const [key, item] of sorted(cities)) {
     const prev = prevCities.get(key)?.count || 0;
-    lines.push(`• ${escapeHtml(item.label)} — ${item.count} · ${MONTHS[prevMonth.m - 1]}: ${prev} → ${delta(item.count, prev)}`);
+    lines.push(`• ${escapeHtml(item.label)} — ${item.count} · ${period.prevShort}: ${prev} → ${delta(item.count, prev)}`);
   }
 
   const reasons = sorted(countBy(rows, (r) => r.reason));
@@ -266,35 +397,57 @@ function buildGeneralReport(rows, prevRows, month, prevMonth) {
   return lines;
 }
 
-function buildLvivReport(allRows, allPrevRows, month, prevMonth) {
-  const rows = allRows.filter(isLviv);
-  const prevRows = allPrevRows.filter(isLviv);
-  const lines = [`📍 <b>${LVIV} — детальний звіт за ${monthName(month)}</b>`, "", totalLine(rows.length, prevRows.length, prevMonth)];
+// Для тижня — по днях, для місяця — по тижнях (1–7, 8–14, …)
+function breakdownLines(rows, period) {
+  const counts = new Map();
+  for (const row of rows) {
+    const t = kyivParts(new Date(row.created_at));
+    const key = `${t.y}-${t.m}-${t.d}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const countOf = (day) => counts.get(`${day.y}-${day.m}-${day.d}`) || 0;
+
+  if (period.kind === "week") {
+    const lines = ["<b>По днях</b>"];
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(period.start, i);
+      lines.push(`${WEEKDAYS[i]} ${fmtDay(day)} — ${countOf(day)}`);
+      if (sameDay(day, period.lastDay)) break;
+    }
+    return lines;
+  }
+
+  const lines = ["<b>По тижнях</b>"];
+  const { y, m } = period.start;
+  const last = period.lastDay.d;
+  for (let first = 1; first <= last; first += 7) {
+    const end = Math.min(first + 6, last);
+    let count = 0;
+    for (let d = first; d <= end; d++) count += countOf({ y, m, d });
+    lines.push(`${pad(first)}.${pad(m)}–${pad(end)}.${pad(m)} — ${count}`);
+  }
+  return lines;
+}
+
+function buildCityReport(city, allRows, allPrevRows, period) {
+  const rows = allRows.filter((r) => isCity(r, city));
+  const prevRows = allPrevRows.filter((r) => isCity(r, city));
+  const lines = [`📍 <b>${escapeHtml(city)} — детальний звіт, ${period.title}</b>`, "", totalLine(rows.length, prevRows.length, period)];
   if (!rows.length) {
-    lines.push("", "За цей місяць відмов по Львову не було.");
+    lines.push("", `За цей період відмов по місту ${escapeHtml(city)} не було.`);
     return lines;
   }
   lines.push(`Частка від усіх відмов: ${percent(rows.length, allRows.length)}%`);
 
-  // Причини з порівнянням із минулим місяцем
+  // Причини з порівнянням із попереднім періодом
   const prevReasons = countBy(prevRows, (r) => r.reason);
   lines.push("", "<b>Причини</b>");
   sorted(countBy(rows, (r) => r.reason)).forEach(([key, item], i) => {
     const prev = prevReasons.get(key)?.count || 0;
-    lines.push(`${i + 1}. ${escapeHtml(item.label)} — ${item.count} (${percent(item.count, rows.length)}%) · ${MONTHS[prevMonth.m - 1]}: ${prev}`);
+    lines.push(`${i + 1}. ${escapeHtml(item.label)} — ${item.count} (${percent(item.count, rows.length)}%) · ${period.prevShort}: ${prev}`);
   });
 
-  // По тижнях місяця: 1–7, 8–14, 15–21, 22–28, 29–кінець
-  const lastDay = daysInMonth(month);
-  const weeks = [];
-  for (let start = 1; start <= lastDay; start += 7) weeks.push({ start, end: Math.min(start + 6, lastDay), count: 0 });
-  for (const row of rows) {
-    const { d } = kyivParts(new Date(row.created_at));
-    weeks[Math.floor((d - 1) / 7)].count += 1;
-  }
-  const mm = pad(month.m);
-  lines.push("", "<b>По тижнях</b>");
-  for (const w of weeks) lines.push(`${pad(w.start)}.${mm}–${pad(w.end)}.${mm} — ${w.count}`);
+  lines.push("", ...breakdownLines(rows, period));
 
   lines.push("", "<b>Хто вносив</b>");
   for (const [, item] of sorted(countBy(rows, (r) => r.author_name))) {
@@ -307,7 +460,8 @@ function buildLvivReport(allRows, allPrevRows, month, prevMonth) {
     const when = `${pad(t.d)}.${pad(t.m)} ${pad(t.hh)}:${pad(t.mm)}`;
     const link = messageLink(row);
     const date = link ? `<a href="${link}">${when}</a>` : when;
-    const who = row.person ? ` · ${escapeHtml(row.person)}` : "";
+    const client = [row.person, row.phone].filter(Boolean).map(escapeHtml).join(", ");
+    const who = client ? ` · ${client}` : "";
     const details = [row.comment && `<i>${escapeHtml(row.comment)}</i>`, row.author_name && `вніс(-ла): ${escapeHtml(row.author_name)}`]
       .filter(Boolean)
       .join(" · ");
@@ -334,20 +488,108 @@ function toMessages(lines) {
   return messages;
 }
 
+// Повідомлення звіту: усі міста — загальний, конкретне місто — детальний
+function reportMessages(city, period, rows, prevRows) {
+  const lines = city === ALL_CITIES
+    ? buildGeneralReport(rows, prevRows, period)
+    : buildCityReport(city, rows, prevRows, period);
+  return toMessages(lines);
+}
+
+// Автоматичний звіт (щотижня й щомісяця): загальний + детальний по Львову
+function scheduledMessages(period, rows, prevRows) {
+  return [...reportMessages(ALL_CITIES, period, rows, prevRows), ...reportMessages(LVIV, period, rows, prevRows)];
+}
+
+// ---------- Кнопки /report ----------
+// callback_data: «rc|<місто>» — обрали місто, «rp|<період>|<місто>» — обрали період, «rb» — назад до міст.
+
+const fits = (data) => Buffer.byteLength(data, "utf8") <= MAX_CALLBACK;
+
+// Місто вміщається в кнопку періоду (найдовший варіант callback_data)
+function cityFitsButtons(city) {
+  return fits(`rp|tw|${city}`);
+}
+
+function cityTitle(city) {
+  return city === ALL_CITIES ? "усі міста" : city;
+}
+
+function cityKeyboard(cities) {
+  const rows = [[{ text: "🌍 Усі міста", callback_data: `rc|${ALL_CITIES}` }]];
+  const buttons = cities
+    .filter((c) => c.label !== "—" && cityFitsButtons(c.label))
+    .slice(0, CITY_BUTTONS)
+    .map((c) => ({ text: `${c.label} (${c.count})`, callback_data: `rc|${c.label}` }));
+  for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2));
+  return { inline_keyboard: rows };
+}
+
+function cityPromptText(cities) {
+  const hint = cities.length
+    ? `Міста з відмовами за останні ${RECENT_DAYS} днів. Іншого міста немає в списку — напиши /report Назва.`
+    : `За останні ${RECENT_DAYS} днів відмов не було. Будь-яке місто можна запитати так: /report Назва.`;
+  return `📊 <b>Звіт по відмовах</b>\nОбери місто.\n\n<i>${hint}</i>`;
+}
+
+function periodKeyboard(city) {
+  const button = (code) => ({ text: PERIODS[code], callback_data: `rp|${code}|${city}` });
+  return {
+    inline_keyboard: [
+      [button("tw"), button("tm")],
+      [button("lw"), button("lm")],
+      [{ text: "← Інше місто", callback_data: "rb" }],
+    ],
+  };
+}
+
+function periodPromptText(city) {
+  return `📊 <b>Звіт по відмовах: ${escapeHtml(cityTitle(city))}</b>\nОбери період.`;
+}
+
+function parseCallback(data) {
+  if (typeof data !== "string") return null;
+  if (data === "rb") return { action: "back" };
+  let m = /^rc\|(.+)$/s.exec(data);
+  if (m) return { action: "city", city: m[1] };
+  m = /^rp\|(tw|tm|lw|lm)\|(.+)$/s.exec(data);
+  if (m) return { action: "period", code: m[1], city: m[2] };
+  return null;
+}
+
 module.exports = {
   LVIV,
+  ALL_CITIES,
+  PERIODS,
   tg,
   webhookSecret,
   parseRefusal,
   normalizeCity,
+  normalizePhone,
   helpText,
   escapeHtml,
   kyivParts,
+  kyivMidnight,
+  addDays,
+  weekdayIndex,
+  mondayOf,
   previousMonth,
   parseMonth,
-  monthDate,
-  monthName,
+  parseDay,
+  makePeriod,
+  periodFor,
+  fetchPeriod,
+  recentCities,
   buildGeneralReport,
-  buildLvivReport,
+  buildCityReport,
   toMessages,
+  reportMessages,
+  scheduledMessages,
+  cityFitsButtons,
+  cityTitle,
+  cityKeyboard,
+  cityPromptText,
+  periodKeyboard,
+  periodPromptText,
+  parseCallback,
 };
