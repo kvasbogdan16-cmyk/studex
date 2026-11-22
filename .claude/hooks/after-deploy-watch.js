@@ -13,6 +13,11 @@ process.stdin.on("end", () => {
     const isPush = /\bgit\s+push\b/i.test(cmd);
     if (!isCliDeploy && !isPush) return;
 
+    // Push у main (git push origin main / HEAD:main) деплоїть основний сайт. Якщо в тій самій команді
+    // пушать і гілку, Vercel зробить ще й preview-деплой, тож агент має стежити саме за production.
+    const toMain = isPush && /\bgit\s+push\b[^;&|\n]*?(?:\s|:)main\b/i.test(cmd);
+    const cliProd = isCliDeploy && /--prod\b/i.test(cmd);
+
     const output = JSON.stringify((input.tool_response && (input.tool_response.stdout || input.tool_response.output)) || input.tool_response || "");
     const url = (output.match(/https:\/\/[a-z0-9-]+-[a-z0-9]+\.vercel\.app/i) || [])[0];
     const since = Date.now() - 60_000;
@@ -20,8 +25,12 @@ process.stdin.on("end", () => {
     const how = url
       ? `Деплой: ${url} — передай агенту цей URL.`
       : isPush
-        ? `Це git push: передай агенту, щоб стежив з --since=${since}.`
-        : `URL деплою не знайдено у виводі — агент візьме найновіший деплой.`;
+        ? toMain
+          ? `Це git push у main (основний сайт): передай агенту, щоб стежив з --prod --since=${since}.`
+          : `Це git push у гілку (preview-деплой): передай агенту, щоб стежив з --since=${since}.`
+        : cliProd
+          ? `URL деплою не знайдено у виводі — передай агенту, щоб стежив з --prod --since=${since}.`
+          : `URL деплою не знайдено у виводі — агент візьме найновіший деплой.`;
 
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {

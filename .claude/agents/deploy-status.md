@@ -19,8 +19,12 @@ Use the watcher script. It checks every 10 seconds by itself and prints the resu
 | Situation | Command |
 |---|---|
 | A specific deployment URL is known | `node scripts/deploy-watch.js <deployment-url>` |
-| Right after `git push` (deployment may not exist yet) | `node scripts/deploy-watch.js --since=<unix ms of the push>` (if unknown, use now minus 60 000) |
-| Just "check the status" | `node scripts/deploy-watch.js` (newest deployment) |
+| Right after `git push` to `main` (the live site) | `node scripts/deploy-watch.js --prod --since=<unix ms of the push>` |
+| Right after `git push` to another branch (preview) | `node scripts/deploy-watch.js --since=<unix ms of the push>` |
+| Just "check the status" of the live site | `node scripts/deploy-watch.js --prod` |
+| Just "check the status" of the newest deployment of any kind | `node scripts/deploy-watch.js` |
+
+If the push time is unknown, use now minus 60 000. Always pass `--prod` when the request is about the live site: one push to `main` plus a branch creates two deployments (production + preview), and without `--prod` you may pick the preview one.
 
 Give the command a timeout of 600000 ms. The last line starts with `RESULT:`:
 - `RESULT: READY` → done, go to step 4.
@@ -40,7 +44,7 @@ Give the command a timeout of 600000 ms. The last line starts with `RESULT:`:
 1. Commit the fix: `git add <changed files>` then `git commit -m "Виправлення помилки деплою: <коротко що>"`.
 2. Deploy the same way the failed deployment was made:
    - CLI deployment → `vercel deploy --prod --yes`, take the new deployment URL from its output.
-   - GitHub deployment → `git push` (never `--force`), then watch with `--since`.
+   - GitHub deployment → push the same branch it was built from (for production: `git push origin HEAD:main`; never `--force`), then watch with `--since` (plus `--prod` for production).
 3. Go back to step 1 with the new deployment.
 
 At most **3 fix attempts**. If it still fails after that, stop and report the last error.

@@ -4,6 +4,9 @@
 //   node scripts/deploy-watch.js <deployment-url>      -> that deployment
 //   node scripts/deploy-watch.js --since=<unix ms>     -> wait for a deployment created after that
 //                                                          moment (e.g. right after git push)
+//   add --prod                                          -> consider only production deployments
+//                                                          (a push to main AND to a branch creates
+//                                                          two deployments: production + preview)
 // Exit codes: 0 = READY, 1 = ERROR/CANCELED (build log tail printed), 2 = timeout / no deployment.
 const { spawnSync } = require("child_process");
 const fs = require("fs");
@@ -17,6 +20,7 @@ const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const sinceArg = args.find((a) => a.startsWith("--since="));
 const since = sinceArg ? Number(sinceArg.slice(8)) : null;
+const prodOnly = args.includes("--prod");
 let target = args.find((a) => !a.startsWith("--")) || null;
 
 function vercel(cliArgs) {
@@ -52,10 +56,10 @@ async function pickTarget() {
   const started = Date.now();
   while (true) {
     const list = deployments();
-    const found = list.find((d) => since === null || d.createdAt >= since);
+    const found = list.find((d) => (since === null || d.createdAt >= since) && (!prodOnly || d.target === "production"));
     if (found) return found.url;
     if (since === null || Date.now() - started > NEW_DEPLOY_WAIT_MS) return null;
-    log("Нового деплою ще немає, чекаю 10 с...");
+    log(`Нового ${prodOnly ? "production-" : ""}деплою ще немає, чекаю 10 с...`);
     await sleep(INTERVAL_MS);
   }
 }
