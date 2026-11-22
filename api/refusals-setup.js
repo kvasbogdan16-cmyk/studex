@@ -1,5 +1,6 @@
 // POST /api/refusals-setup — один раз підключає бота чату відмов: вебхук і список команд.
-// Захищено секретом TG_SERVER_SECRET (заголовок X-Setup-Secret), тож викликати може лише власник.
+// Захищено секретом: X-Setup-Secret: <TG_SERVER_SECRET> або Authorization: Bearer <CRON_SECRET>,
+// тож викликати може лише власник.
 
 const { env, sameSecret } = require("./_telegram");
 const { tg, webhookSecret } = require("./_refusals");
@@ -9,7 +10,12 @@ module.exports = async function handler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!sameSecret(req.headers["x-setup-secret"], env("TG_SERVER_SECRET"))) {
+  // Власник підтверджує запит одним із серверних секретів: TG_SERVER_SECRET або CRON_SECRET
+  const cronSecret = env("CRON_SECRET");
+  const allowed =
+    sameSecret(req.headers["x-setup-secret"], env("TG_SERVER_SECRET")) ||
+    sameSecret(req.headers.authorization, cronSecret && `Bearer ${cronSecret}`);
+  if (!allowed) {
     return res.status(403).json({ error: "Forbidden" });
   }
   if (!env("REFUSALS_BOT_TOKEN")) return res.status(500).json({ error: "REFUSALS_BOT_TOKEN не задано" });
