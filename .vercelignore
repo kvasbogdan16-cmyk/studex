@@ -4,3 +4,6 @@ README.md
 .claude
 scripts
 .dev-server.log
+
+# Звіт аудиту безпеки — не публікувати
+securityaudit.md
