@@ -1,0 +1,7 @@
+# vibe-flow:git-guards:begin (managed by vibe-flow, do not edit inside)
+scripts/*.sh text eol=lf
+scripts/git-guards/** text eol=lf
+githooks/** text eol=lf
+.claude/hooks/** text eol=lf
+.gitguards.conf text eol=lf
+# vibe-flow:git-guards:end

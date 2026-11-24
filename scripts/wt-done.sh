@@ -1,0 +1,356 @@
+#!/usr/bin/env bash
+# wt-done.sh <name> [--force] — close a workspace: stop dev, close the Orca
+# tabs, remove the directory, delete the branch, release the GitHub issue claimed
+# for this branch by `wt-new.sh --issue N`.
+#
+# WHY A SEPARATE SCRIPT. `wt-new.sh` starts dev, but `git worktree remove`
+# knows nothing about it: the directory disappears while the process lives on as
+# an orphan holding the port. Verified 10.09.2026 — hung servers piled up within days.
+#
+# 🔴 NOTHING IS DELETED SILENTLY. Uncommitted changes and unpushed commits mean
+# a stop with an explanation, not "swallowed along with the directory": that is
+# exactly the loss of work the whole kit was built to prevent.
+set -eu
+
+[ $# -ge 1 ] || { echo "usage: wt-done.sh <name> [--force]"; exit 2; }
+NAME="$1"; FORCE="${2:-}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# ── Project configuration ────────────────────────────────────────────────────
+# 🔴 Read as TEXT from the protected branch (scripts/git-guards/conf.sh), never
+# sourced: an uncommitted GG_PROTECTED used to unlock deleting unpushed work.
+GG_CONF_LIB="$ROOT/scripts/git-guards/conf.sh"
+if [ ! -f "$GG_CONF_LIB" ]; then
+    echo "🔴 scripts/git-guards/conf.sh missing — the kit in this tree is incomplete: merge the protected branch into it" >&2
+    echo "   (scripts/wt-new.sh --resume <branch> --merge-main from the main folder) or reinstall the kit (/vibe-flow:init)" >&2
+    exit 1
+fi
+. "$GG_CONF_LIB"           # also brings scripts/git-guards/paths.sh (gg_path, gg_is_abs, gg_is_msys)
+GG_PYENV_LIB="$ROOT/scripts/git-guards/pyenv.sh"
+[ -f "$GG_PYENV_LIB" ] || { echo "🔴 scripts/git-guards/pyenv.sh missing — the kit in this tree is incomplete: reinstall it (/vibe-flow:init)" >&2; exit 1; }
+. "$GG_PYENV_LIB"
+# rc 2: the protected branch's policy is unreadable — conf.sh has said so; stop (K8).
+gg_conf_init "$ROOT" || { [ "$?" = 2 ] || echo "🔴 cannot read the repository at $ROOT"; exit 1; }
+GG_PROTECTED=$GG_PROT
+GG_WT_DIR=$(gg_get GG_WT_DIR "")
+GG_DEV_PROC_MATCH=$(gg_get GG_DEV_PROC_MATCH "")   # part of the dev process name, for killing orphans
+
+MAIN=$(git -C "$ROOT" worktree list --porcelain | awk '/^worktree /{print substr($0, 10); exit}')
+WT_BASE="${GG_WT_DIR:-$(dirname "$MAIN")/$(basename "$MAIN")-wt}"
+if ! gg_is_abs "$WT_BASE"; then     # GG_WT_DIR=D:/x on Windows is absolute too
+    WT_BASE="$(cd "$MAIN" && cd "$(dirname "$WT_BASE")" && pwd)/$(basename "$WT_BASE")"
+fi
+DIR="$WT_BASE/$NAME"
+
+[ -d "$DIR" ] || { echo "🔴 no directory $DIR"; exit 1; }
+
+# 🔴 THE BRANCH IS READ FROM THE TREE ITSELF, NOT DERIVED FROM THE DIRECTORY NAME.
+# The old `BRANCH="wt/$NAME"` is correct only while the names match. Since
+# `wt-new.sh --resume <branch> <dir-name>` exists, they legitimately diverge, and
+# deriving by name at best finds no branch, and at worst finds an UNRELATED one
+# with that name and deletes it. Caught 10.09.2026 while reviewing --resume.
+BRANCH=$(git -C "$DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
+if [ -z "$BRANCH" ]; then
+    echo "🔴 $DIR has a detached HEAD — no way to determine the branch, not deleting blindly."
+    echo "   Remove manually:  git worktree remove $DIR"
+    exit 1
+fi
+# Whatever the config says, the protected branch itself is never deleted.
+if [ "$BRANCH" = "$GG_PROTECTED" ]; then
+    echo "🔴 $BRANCH is the protected branch — not deleting it (with or without --force)."
+    exit 1
+fi
+
+# ── 0. Plans written in this tree go to the main tree ───────────────────────
+# The plans folder (Claude Code `plansDirectory`, default .plans) is git-ignored:
+# `git status` below does not see it, and `worktree remove --force` would erase the
+# plans approved in this tree. Move them first, with --force too. A DIFFERENT plan
+# with the same name in the main tree stops everything before anything is moved.
+# Same rule for the folder as plans_dirs() in plan-gate.sh; the value is read as
+# JSON, never sourced.
+gg_python 2>/dev/null || true       # no Python: the default folder (.plans) below
+PD=$("${GG_PY:-python3}" - "$MAIN/.claude/settings.json" <<'PY' 2>/dev/null || true
+import json, os, re, sys
+v = ".plans"
+if os.path.isfile(sys.argv[1]):
+    try:
+        v = json.load(open(sys.argv[1], encoding="utf-8")).get("plansDirectory", ".plans")
+    except Exception:
+        v = ".plans"
+ok = isinstance(v, str) and re.fullmatch(r"\.?[A-Za-z0-9_][A-Za-z0-9_./-]*", v) and ".." not in v.split("/")
+print(v.rstrip("/") if ok else "")
+PY
+)
+if [ -n "$PD" ] && [ -n "$(git -C "$DIR" ls-files -- "$PD" 2>/dev/null)" ]; then
+    PD=""     # a plans folder the project keeps in git travels with the branch, not by us
+fi
+# The tree is not the main folder — compared normalized (git's C:/… vs the shell's /c/…).
+if [ -n "$PD" ] && [ -d "$DIR/$PD" ] && [ ! -L "$DIR/$PD" ] \
+   && [ "$(gg_path "$DIR" 2>/dev/null || printf '%s' "$DIR")" != "$(gg_path "$MAIN" 2>/dev/null || printf '%s' "$MAIN")" ]; then
+    PSRC="$DIR/$PD"; PDST="$MAIN/$PD"
+    if [ -L "$PDST" ]; then
+        echo "🔴 $PDST is a symlink — the plans of $NAME are not moved, the tree is kept."
+        exit 1
+    fi
+    PCONFLICT=""
+    for f in "$PSRC"/*.md; do
+        if [ -f "$f" ] && [ ! -L "$f" ] && [ -e "$PDST/$(basename "$f")" ] && ! cmp -s "$f" "$PDST/$(basename "$f")"; then
+            PCONFLICT="$PCONFLICT $(basename "$f")"
+        fi
+    done
+    if [ -n "$PCONFLICT" ]; then
+        echo "🔴 these plans already exist in $PDST with a different text:$PCONFLICT"
+        echo "   Nothing moved, the tree is kept. Rename or merge them, then run wt-done.sh again."
+        exit 1
+    fi
+    PMOVED=0
+    for f in "$PSRC"/*.md; do
+        if [ -f "$f" ] && [ ! -L "$f" ]; then
+            mkdir -p "$PDST"
+            if [ -e "$PDST/$(basename "$f")" ]; then
+                rm -f "$f"                                   # the same text is already there
+            else
+                if ! cp -p "$f" "$PDST/$(basename "$f")"; then
+                    echo "🔴 could not copy $f into $PDST — the tree is kept."
+                    exit 1
+                fi
+                rm -f "$f"; PMOVED=$((PMOVED + 1))
+            fi
+        fi
+    done
+    if [ "$PMOVED" -gt 0 ]; then echo "  plans moved to $PDST: $PMOVED"; fi
+fi
+
+# ── 1. Checks that no work will be lost ──────────────────────────────────────
+# 🔴 NO PIPES WHEN READING COUNTERS. The old form
+#     UNPUSHED=$(git log "@{upstream}..HEAD" 2>/dev/null | wc -l || echo "?")
+# returns the status of `wc`, not `git`: with no upstream (and every fresh branch
+# that has never been pushed has none) git silently printed nothing, wc gave "0",
+# the "?" branch was unreachable — and cleanup WIPED the branch together with its
+# unpushed commits. Exactly the loss of work this script was written to prevent.
+# Caught 10.09.2026 during acceptance.
+# stdout only: git's warnings go to stderr ("LF will be replaced by CRLF" on Windows)
+# and used to be counted as uncommitted files; on failure git's message is shown as is.
+if ! DIRTY_OUT=$(cd "$DIR" && git status --porcelain); then
+    echo "🔴 could not read the state of $DIR (git's message above)"
+    exit 1
+fi
+DIRTY=$(printf '%s' "$DIRTY_OUT" | grep -c . || true)
+
+# Commits that exist NOWHERE except this branch: not on any remote-tracking
+# ref, not in the protected branch. These are what deletion would destroy.
+ORPHANED=$(cd "$DIR" && git rev-list --count HEAD \
+    --not --remotes "refs/heads/$GG_PROTECTED" 2>/dev/null || echo "")
+if [ -z "$ORPHANED" ]; then
+    echo "🔴 could not compare the history of $NAME with the remote and $GG_PROTECTED — not deleting."
+    echo "   Remove deliberately:  wt-done.sh $NAME --force"
+    exit 1
+fi
+
+if [ "$FORCE" != "--force" ]; then
+    if [ "$DIRTY" != "0" ]; then
+        echo "🔴 $NAME has uncommitted changes ($DIRTY files):"
+        printf '%s\n' "$DIRTY_OUT" | head -8 | sed 's/^/     /'
+        echo
+        echo "   Commit them or remove deliberately:  wt-done.sh $NAME --force"
+        exit 1
+    fi
+    if [ "$ORPHANED" != "0" ]; then
+        echo "🔴 $NAME has $ORPHANED commit(s) that are not on any remote"
+        echo "   and not in $GG_PROTECTED — deleting the branch will destroy them:"
+        (cd "$DIR" && git log --oneline HEAD --not --remotes "refs/heads/$GG_PROTECTED" \
+            2>/dev/null | head -5 | sed 's/^/     /')
+        echo
+        echo "   Push them or remove deliberately:  wt-done.sh $NAME --force"
+        exit 1
+    fi
+fi
+
+# ── 2. Stop dev ──────────────────────────────────────────────────────────────
+# Windows (Git Bash): the native dev server (node.exe) is out of reach of MSYS kill,
+# so its whole Windows process tree goes with taskkill. wt-new.sh writes
+# "<windows pid> msys:<msys pid>" (older: one of the two). The launch-time Windows pid
+# goes stale — each exec of the launch chain is a new Windows process under the same
+# msys pid — so the CURRENT one is read from /proc/<msys pid>/winpid. No such /proc
+# entry = the chain has ended = dev is no longer running.
+win_alive() { tasklist //FI "PID eq $1" //NH 2>/dev/null | grep -qw "$1"; }
+stop_dev_windows() {   # $1 = content of .wt-dev.pid
+    local tok msys="" win="" bad=0
+    for tok in $1; do
+        case "$tok" in
+            msys:*) msys=${tok#msys:} ;;
+            *) win=$tok ;;
+        esac
+    done
+    case "$msys$win" in ''|*[!0-9]*) bad=1 ;; esac
+    if [ "$bad" = 1 ]; then
+        echo "  ⚠️  .wt-dev.pid is unreadable — stop the dev server manually"; return
+    fi
+    if [ -n "$msys" ] && [ -d /proc ]; then
+        if [ ! -e "/proc/$msys" ]; then
+            echo "  dev is no longer running"; return
+        fi
+        win=$(cat "/proc/$msys/winpid" 2>/dev/null || true)
+        case "$win" in ''|*[!0-9]*) win="" ;; esac
+    fi
+    if [ -z "$win" ]; then
+        echo "  ⚠️  stop the dev server manually: pid ${msys:-?} (its Windows pid cannot be read)"; return
+    fi
+    if command -v tasklist >/dev/null 2>&1 && ! win_alive "$win"; then
+        echo "  dev is no longer running"
+        return
+    fi
+    taskkill //T //F //PID "$win" >/dev/null 2>&1 || true
+    sleep 1
+    if command -v tasklist >/dev/null 2>&1 && win_alive "$win"; then
+        echo "  ⚠️  stop the dev server manually: Windows pid $win is still running"
+    else
+        echo "  dev stopped (Windows pid $win)"
+    fi
+}
+if [ -f "$DIR/.wt-dev.pid" ] && gg_is_msys; then
+    stop_dev_windows "$(cat "$DIR/.wt-dev.pid" 2>/dev/null || true)"
+elif [ -f "$DIR/.wt-dev.pid" ]; then
+    PID=$(cat "$DIR/.wt-dev.pid" 2>/dev/null || true)
+    if [ -n "${PID:-}" ] && kill -0 "$PID" 2>/dev/null; then
+        # Kill the whole process tree: a dev server often starts its worker process
+        # separately, and killing only the parent leaves the port taken.
+        pkill -P "$PID" 2>/dev/null || true
+        kill "$PID" 2>/dev/null || true
+        sleep 1
+        kill -0 "$PID" 2>/dev/null && kill -9 "$PID" 2>/dev/null || true
+        echo "  dev stopped (pid $PID)"
+    else
+        echo "  dev is no longer running"
+    fi
+fi
+
+# Safety net: a process whose working directory is this directory but whose pid file is lost.
+# `lsof +D` does not exist on Windows: say so instead of silently doing nothing.
+if [ -n "$GG_DEV_PROC_MATCH" ] && gg_is_msys; then
+    echo "  ⚪️ orphaned dev processes (lsof +D) — not available on Windows; check Task Manager"
+elif [ -n "$GG_DEV_PROC_MATCH" ]; then
+    for p in $(lsof -t +D "$DIR" 2>/dev/null | head -20); do
+        cmd=$(ps -p "$p" -o command= 2>/dev/null || true)
+        case "$cmd" in
+            *"$GG_DEV_PROC_MATCH"*)
+                kill "$p" 2>/dev/null && echo "  killed orphaned dev (pid $p)" || true;;
+        esac
+    done
+fi
+
+# ── 2b. Close this workspace's Orca tabs ─────────────────────────────────────
+# Relevant on machines where the project is open in Orca; elsewhere the step is silent.
+#
+# 🔴 The order is mandatory: BEFORE `git worktree remove`. Orca identifies a workspace
+# by path, and once the directory is gone its selector answers `selector_not_found` —
+# there is no regular command left to close the tabs with.
+#
+# Without this step the directory is removed and the branch deleted, but the workspace
+# stays in the Orca sidebar: its terminal tabs are alive, their shell holds the deleted
+# directory as cwd (on macOS a folder lives while someone holds it open), and Orca
+# considers the workspace active. Afterwards it can only be removed by hand. That is
+# how one machine's registry accumulated seven dead paths.
+#
+# The call is useful even with zero tabs: the response has `retiredSurfaces: true` —
+# Orca marks the workspace's surfaces as retired.
+#
+# All best-effort: no Orca, runtime not up, output format changed — the workspace
+# must be removed regardless. So every call's failure is swallowed, and under
+# `set -e` only `if` is used here: `[ ... ] && echo` would crash the script exactly
+# where there is nothing to close.
+if command -v orca >/dev/null 2>&1 && gg_python 2>/dev/null; then
+    CLOSED=0
+
+    # Main path: close all of the workspace's terminals with one command.
+    WT_ID=$(orca worktree list --json 2>/dev/null \
+        | "$GG_PY" -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    raise SystemExit
+for w in d.get('result', {}).get('worktrees', []):
+    if w.get('path') == sys.argv[1]:
+        print(w.get('id', ''))
+        break
+" "$DIR" 2>/dev/null || true)
+
+    if [ -n "${WT_ID:-}" ]; then
+        N=$(orca terminal close --worktree "$WT_ID" --all --json 2>/dev/null \
+            | "$GG_PY" -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    raise SystemExit
+print(int(d.get('result', {}).get('closed', 0) or 0))
+" 2>/dev/null || true)
+        CLOSED=$(( CLOSED + ${N:-0} ))
+    fi
+
+    # Cleanup: tabs bound to the path but that lost their workspace in the Orca
+    # registry (that is how orphaned tabs from earlier removals linger).
+    # The selector no longer works for them — close them one by one, by handle.
+    for h in $(orca terminal list --json 2>/dev/null \
+        | "$GG_PY" -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    raise SystemExit
+for t in d.get('result', {}).get('terminals', []):
+    if sys.argv[1] in str(t.get('worktreeId', '')):
+        h = t.get('handle')
+        if h:
+            print(h)
+" "$DIR" 2>/dev/null || true); do
+        if orca terminal close --terminal "$h" --tab --json >/dev/null 2>&1; then
+            CLOSED=$(( CLOSED + 1 ))
+        fi
+    done
+
+    if [ "$CLOSED" -gt 0 ]; then
+        echo "  Orca tabs closed: $CLOSED"
+    fi
+fi
+
+# ── 3. Remove the directory and the branch ───────────────────────────────────
+git -C "$ROOT" worktree remove --force "$DIR" && echo "  directory removed: $DIR"
+git -C "$ROOT" branch -D "$BRANCH" 2>/dev/null | sed 's/^/  /' || echo "  no local branch $BRANCH"
+
+# ── 3b. Release the issue claim of this branch (wt-new.sh --issue N) ─────────
+# Only claims whose owner names THIS branch: someone else's claim is not touched.
+# The script removes it itself — sessions are not allowed to write into
+# monitorex-locks/ directly.
+COMMON=$(git -C "$ROOT" rev-parse --git-common-dir 2>/dev/null || true)
+if [ -n "$COMMON" ] && ! gg_is_abs "$COMMON"; then COMMON="$(gg_path "$ROOT" "$COMMON" 2>/dev/null || true)"; fi
+if [ -n "$COMMON" ]; then
+    for c in "$COMMON"/monitorex-locks/claims/issue-*; do
+        [ -d "$c" ] || continue
+        n="${c##*/issue-}"
+        case "$n" in ''|*[!0-9]*) continue ;; esac
+        if [ "$(sed -n 's/^branch=//p' "$c/owner" 2>/dev/null | head -1)" = "$BRANCH" ]; then
+            rm -rf "$c" && echo "  issue #$n released"
+        fi
+    done
+fi
+
+# ── 4. Hint about the remote branch ──────────────────────────────────────────
+# 🔴 `git push origin --delete` is blocked by pre-push: a deletion sends a zero
+# ref, and the hook takes it for pushing a foreign commit. There is no code in it —
+# nothing to check, so the regular path is via the API, not `--no-verify`.
+if git -C "$ROOT" ls-remote --heads origin "$BRANCH" 2>/dev/null | grep -q .; then
+    SLUG=$(git -C "$ROOT" remote get-url origin 2>/dev/null \
+        | sed -E 's#^git@[^:]+:##; s#^https?://[^/]+/##; s#\.git$##')
+    echo
+    echo "  The branch still exists on origin. If it is merged, delete it like this:"
+    if [ -n "$SLUG" ]; then
+        echo "    gh api -X DELETE repos/$SLUG/git/refs/heads/$BRANCH"
+    else
+        echo "    gh api -X DELETE repos/<owner>/<repo>/git/refs/heads/$BRANCH"
+    fi
+fi
+
+echo
+echo "Done: $NAME closed."

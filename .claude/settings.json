@@ -6,7 +6,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": [".claude/hooks/after-plan-dev-server.js"],
+            "args": [
+              ".claude/hooks/after-plan-dev-server.js"
+            ],
             "timeout": 15,
             "statusMessage": "Перевіряю, чи треба перезапустити дев-сервер"
           }
@@ -20,11 +22,53 @@
           {
             "type": "command",
             "command": "node",
-            "args": [".claude/hooks/after-deploy-watch.js"],
+            "args": [
+              ".claude/hooks/after-deploy-watch.js"
+            ],
             "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/plan-approved.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit-tests.sh\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/monitorex-git-guard.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/monitorex-git-guard.sh\""
           }
         ]
       }
     ]
-  }
+  },
+  "plansDirectory": ".plans"
 }
