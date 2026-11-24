@@ -7,3 +7,10 @@ scripts
 
 # Звіт аудиту безпеки — не публікувати
 securityaudit.md
+
+# Службові файли розробки — не для сайту
+.plans
+githooks
+.gitguards.conf
+.gitattributes
+tests

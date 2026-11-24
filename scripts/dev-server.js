@@ -44,10 +44,27 @@ function wrapRes(res) {
   return res;
 }
 
+// Заголовки з vercel.json (CSP тощо), щоб локально все працювало як на Vercel.
+// Шаблони source у нас прості ("/", "/admin", "/(.*)"), тож вистачає RegExp.
+let headerRules = [];
+try {
+  const cfg = JSON.parse(fs.readFileSync(path.join(root, "vercel.json"), "utf8"));
+  headerRules = (cfg.headers || []).map((r) => ({ re: new RegExp(`^${r.source}$`), headers: r.headers }));
+} catch (err) {
+  console.warn("vercel.json headers not applied:", err.message);
+}
+
+function applyHeaders(res, pathname) {
+  for (const rule of headerRules) {
+    if (rule.re.test(pathname)) for (const h of rule.headers) res.setHeader(h.key, h.value);
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   let pathname = decodeURIComponent(url.pathname);
   console.log(req.method, pathname);
+  applyHeaders(res, pathname);
 
   if (pathname.startsWith("/api/")) {
     const file = path.join(root, "api", pathname.slice(5).replace(/\.js$/, "") + ".js");
