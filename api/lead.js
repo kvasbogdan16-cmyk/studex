@@ -42,7 +42,13 @@ async function saveLead(lead) {
     },
     body: JSON.stringify(lead),
   });
-  if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const text = await res.text();
+    const err = new Error(`Supabase ${res.status}: ${text}`);
+    // Ліміт заявок перевіряє база (тригер у supabase-ratelimit.sql)
+    if (text.includes("too_many_requests")) err.code = "rate_limited";
+    throw err;
+  }
 }
 
 // source — звідки заявка; extra — додаткові рядки (наприклад, нікнейм у Telegram)
@@ -110,6 +116,12 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // Лише JSON: звичайна HTML-форма з чужого сайту так надіслати не може
+  // (наш script.js завжди шле application/json)
+  if (!String(req.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
+    return res.status(415).json({ error: "Некоректні дані" });
+  }
+
   let body = req.body || {};
   if (typeof body === "string") {
     try {
@@ -118,6 +130,13 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: "Некоректні дані" });
     }
   }
+  if (!body || typeof body !== "object") return res.status(400).json({ error: "Некоректні дані" });
+
+  // Пастку заповнив бот: відповідаємо «успіх», але нічого не зберігаємо і не надсилаємо
+  if (typeof body.hp === "string" && body.hp.trim()) {
+    console.warn("[lead] відкинуто заявку бота (заповнене поле-пастка)");
+    return res.status(200).json({ ok: true, telegram: "skipped" });
+  }
 
   const { lead, error } = validate(body);
   if (error) return res.status(400).json({ error });
@@ -125,6 +144,11 @@ module.exports = async function handler(req, res) {
   try {
     await saveLead(lead);
   } catch (err) {
+    if (err.code === "rate_limited") {
+      // Видно в логах Vercel: якщо таких багато, форму хтось флудить
+      console.warn("[lead] rate_limited");
+      return res.status(429).json({ error: "Забагато заявок. Спробуй пізніше." });
+    }
     console.error("[supabase]", err.message);
     return res.status(502).json({ error: "Не вдалося зберегти заявку" });
   }

@@ -857,6 +857,15 @@ button {
   gap: 18px;
 }
 
+/* Поле-пастка для ботів: поза екраном, людина його не бачить */
+.apply__hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 .field {
   display: grid;
   gap: 6px;
