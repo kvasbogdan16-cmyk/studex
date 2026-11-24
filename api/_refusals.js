@@ -471,12 +471,24 @@ function buildCityReport(city, allRows, allPrevRows, period) {
   return lines;
 }
 
+// Обрізає задовгий рядок, не ламаючи HTML для Telegram: прибирає теги (форматування
+// лише цього рядка втрачається) і не розрізає сутність &amp; / &lt; / &gt;.
+// Інакше Telegram відхиляє все повідомлення («can't parse entities»).
+function truncateHtml(line, max) {
+  const text = line.replace(/<[^>]*>/g, "");
+  if (text.length <= max) return text;
+  let cut = max - 1;
+  const amp = text.lastIndexOf("&", cut - 1);
+  if (amp !== -1 && text.indexOf(";", amp) >= cut) cut = amp;
+  return text.slice(0, cut) + "…";
+}
+
 // Ділить рядки на повідомлення до ліміту Telegram, не розриваючи рядок
 function toMessages(lines) {
   const messages = [];
   let current = "";
   for (const raw of lines) {
-    const line = raw.length > MAX_MESSAGE ? raw.slice(0, MAX_MESSAGE - 1) + "…" : raw;
+    const line = raw.length > MAX_MESSAGE ? truncateHtml(raw, MAX_MESSAGE) : raw;
     if (current && current.length + 1 + line.length > MAX_MESSAGE) {
       messages.push(current);
       current = line;
