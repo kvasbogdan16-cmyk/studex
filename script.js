@@ -125,7 +125,9 @@ async function sendApplication() {
     name,
     phone: applyForm.elements.phone.value.trim(),
     comment: applyForm.elements.comment.value.trim() || null,
-    hp: applyForm.elements.studex_hp.value, // пастка для ботів: у людей завжди порожньо
+    // Пастка для ботів: у людей завжди порожньо. «?.» — щоб форма не впала,
+    // якщо браузер віддав кешовану стару сторінку без цього поля
+    hp: applyForm.elements.studex_hp?.value || "",
   };
 
   submitBtn.disabled = true;
