@@ -14,3 +14,6 @@ githooks
 .gitguards.conf
 .gitattributes
 tests
+
+# Код Apps Script для Google Таблиці відмов — вставляється в таблицю, сайту не потрібен
+google-sheets-refusals.gs
