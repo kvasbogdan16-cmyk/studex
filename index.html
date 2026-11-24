@@ -379,6 +379,12 @@
                 <textarea id="apply-comment" name="comment" rows="3" placeholder="Яку роботу шукаєш або кого хочеш знайти?"></textarea>
               </div>
 
+              <!-- Пастка для ботів: людина цього поля не бачить, бот заповнює -->
+              <div class="apply__hp" aria-hidden="true">
+                <label for="apply-hp">Залиш це поле порожнім</label>
+                <input id="apply-hp" name="studex_hp" type="text" tabindex="-1" autocomplete="off">
+              </div>
+
               <p class="apply__error" id="apply-form-error" role="alert"></p>
               <button type="submit" class="btn btn--lime apply__submit">Надіслати заявку</button>
             </form>

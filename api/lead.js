@@ -42,21 +42,13 @@ async function saveLead(lead) {
     },
     body: JSON.stringify(lead),
   });
-  if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
-}
-
-// Якщо TELEGRAM_CHAT_ID ще не задано — беремо чат, з якого востаннє писали боту
-async function findChatId(token) {
-  const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
-  const data = await res.json();
-  if (!data.ok) {
-    console.error("[telegram] getUpdates:", data.error_code, data.description);
-    throw new Error(data.error_code === 401 ? "bad-token" : "getUpdates-failed");
+  if (!res.ok) {
+    const text = await res.text();
+    const err = new Error(`Supabase ${res.status}: ${text}`);
+    // Ліміт заявок перевіряє база (тригер у supabase-ratelimit.sql)
+    if (text.includes("too_many_requests")) err.code = "rate_limited";
+    throw err;
   }
-  const messages = data.result
-    .map((u) => u.message || u.my_chat_member)
-    .filter((m) => m && m.chat && m.chat.type === "private");
-  return messages.length ? messages[messages.length - 1].chat.id : null;
 }
 
 // source — звідки заявка; extra — додаткові рядки (наприклад, нікнейм у Telegram)
@@ -92,14 +84,12 @@ async function notifyTelegram(lead, options) {
     return "skipped";
   }
 
-  let chatId = process.env.TELEGRAM_CHAT_ID;
+  // Лише явно заданий чат. Бот публічний (Mini App), тож «останній, хто написав боту»
+  // може бути будь-яким студентом — заявки з персональними даними не можна слати навмання.
+  const chatId = (process.env.TELEGRAM_CHAT_ID || "").trim();
   if (!chatId) {
-    chatId = await findChatId(token);
-    if (!chatId) {
-      console.warn("[telegram] Не знайдено чат: напиши боту /start");
-      return "no-chat";
-    }
-    console.log(`[telegram] Знайдено TELEGRAM_CHAT_ID=${chatId}`);
+    console.warn("[telegram] TELEGRAM_CHAT_ID не задано — сповіщення пропущено");
+    return "no-chat";
   }
 
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -114,8 +104,8 @@ async function notifyTelegram(lead, options) {
   });
   const data = await res.json();
   if (!data.ok) {
-    console.error("[telegram] Помилка надсилання:", data.description);
-    return "error";
+    console.error("[telegram] Помилка надсилання:", data.error_code, data.description);
+    return data.error_code === 401 ? "bad-token" : "error";
   }
   return "sent";
 }
@@ -126,6 +116,12 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // Лише JSON: звичайна HTML-форма з чужого сайту так надіслати не може
+  // (наш script.js завжди шле application/json)
+  if (!String(req.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
+    return res.status(415).json({ error: "Некоректні дані" });
+  }
+
   let body = req.body || {};
   if (typeof body === "string") {
     try {
@@ -134,6 +130,13 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: "Некоректні дані" });
     }
   }
+  if (!body || typeof body !== "object") return res.status(400).json({ error: "Некоректні дані" });
+
+  // Пастку заповнив бот: відповідаємо «успіх», але нічого не зберігаємо і не надсилаємо
+  if (typeof body.hp === "string" && body.hp.trim()) {
+    console.warn("[lead] відкинуто заявку бота (заповнене поле-пастка)");
+    return res.status(200).json({ ok: true, telegram: "skipped" });
+  }
 
   const { lead, error } = validate(body);
   if (error) return res.status(400).json({ error });
@@ -141,6 +144,11 @@ module.exports = async function handler(req, res) {
   try {
     await saveLead(lead);
   } catch (err) {
+    if (err.code === "rate_limited") {
+      // Видно в логах Vercel: якщо таких багато, форму хтось флудить
+      console.warn("[lead] rate_limited");
+      return res.status(429).json({ error: "Забагато заявок. Спробуй пізніше." });
+    }
     console.error("[supabase]", err.message);
     return res.status(502).json({ error: "Не вдалося зберегти заявку" });
   }
@@ -151,7 +159,6 @@ module.exports = async function handler(req, res) {
     telegram = await notifyTelegram(lead);
   } catch (err) {
     console.error("[telegram]", err.message);
-    if (err.message === "bad-token") telegram = "bad-token";
   }
 
   return res.status(200).json({ ok: true, telegram });

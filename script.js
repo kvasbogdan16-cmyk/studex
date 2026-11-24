@@ -125,6 +125,9 @@ async function sendApplication() {
     name,
     phone: applyForm.elements.phone.value.trim(),
     comment: applyForm.elements.comment.value.trim() || null,
+    // Пастка для ботів: у людей завжди порожньо. «?.» — щоб форма не впала,
+    // якщо браузер віддав кешовану стару сторінку без цього поля
+    hp: applyForm.elements.studex_hp?.value || "",
   };
 
   submitBtn.disabled = true;
@@ -138,6 +141,12 @@ async function sendApplication() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(lead),
     });
+    if (res.status === 429) {
+      // Ліміт заявок (перевіряє база): показуємо текст сервера, а не «перевір інтернет»
+      const data = await res.json().catch(() => ({}));
+      formError.textContent = data.error || "Забагато заявок. Спробуй пізніше.";
+      return;
+    }
     if (!res.ok) throw new Error(`api/lead ${res.status}: ${await res.text()}`);
 
     applySuccessText.textContent = `${name}, ми зв'яжемося з тобою найближчим часом.`;

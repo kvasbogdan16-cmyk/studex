@@ -44,10 +44,27 @@ function wrapRes(res) {
   return res;
 }
 
+// Заголовки з vercel.json (CSP тощо), щоб локально все працювало як на Vercel.
+// Шаблони source у нас прості ("/", "/admin", "/(.*)"), тож вистачає RegExp.
+let headerRules = [];
+try {
+  const cfg = JSON.parse(fs.readFileSync(path.join(root, "vercel.json"), "utf8"));
+  headerRules = (cfg.headers || []).map((r) => ({ re: new RegExp(`^${r.source}$`), headers: r.headers }));
+} catch (err) {
+  console.warn("vercel.json headers not applied:", err.message);
+}
+
+function applyHeaders(res, pathname) {
+  for (const rule of headerRules) {
+    if (rule.re.test(pathname)) for (const h of rule.headers) res.setHeader(h.key, h.value);
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   let pathname = decodeURIComponent(url.pathname);
   console.log(req.method, pathname);
+  applyHeaders(res, pathname);
 
   if (pathname.startsWith("/api/")) {
     const file = path.join(root, "api", pathname.slice(5).replace(/\.js$/, "") + ".js");
@@ -68,8 +85,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname.endsWith("/")) pathname += "index.html";
+  // Службові файли (.env.local, .git, .vercel, .claude …) не віддаємо
+  if (pathname.split(/[\\/]/).some((part) => part.startsWith("."))) {
+    res.statusCode = 404; return res.end("Not found");
+  }
   let file = path.join(root, pathname);
-  if (!file.startsWith(root)) { res.statusCode = 403; return res.end(); }
+  if (!file.startsWith(root + path.sep)) { res.statusCode = 403; return res.end(); }
   if (!path.extname(file) && fs.existsSync(file + ".html")) file += ".html";
   if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     res.statusCode = 404; return res.end("Not found");
@@ -79,4 +100,5 @@ const server = http.createServer(async (req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
-server.listen(port, () => console.log(`Ready: http://localhost:${port} (root: ${root})`));
+// Лише цей комп'ютер: інші пристрої в мережі (спільний Wi-Fi) сервер не бачать
+server.listen(port, "127.0.0.1", () => console.log(`Ready: http://localhost:${port} (root: ${root})`));
