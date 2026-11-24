@@ -7,16 +7,17 @@ the root HTML/CSS/JS files are served as they are, and every `api/*.js` file is 
 
 | Domain | Frontend | Server | DB (run in this order) |
 |---|---|---|---|
-| Lead form (landing) | `index.html`, `script.js`, `style.css` | `api/lead.js` → Supabase + Telegram notification | `supabase.sql` (`leads`), rate limit `supabase-ratelimit.sql` |
+| Lead form (landing) | `index.html`, `script.js`, `style.css` | `api/lead.js` → Supabase + Telegram notification | `supabase.sql` (`leads`) |
 | Admin / CRM | `admin.html`, `admin.js`, `admin.css` | `api/config.js` (public Supabase settings) | `supabase-admin.sql` (`admins`, `is_admin()`), `supabase-crm.sql` (funnel, history) |
 | Business-card scan | admin «Візитка» | `api/scan.js` → Claude API | `supabase-scan.sql` (private storage) |
 | Telegram Mini App | `tg.html`, `tg.js`, `tg.css` | `api/tg-lead.js`, `api/tg-me.js`, `api/tg-setup.js`, shared `api/_telegram.js` | `supabase-telegram.sql` |
 | Vacancy images | admin «Картинки» | `api/generate.js` → OpenAI GPT Image | `supabase-images.sql` (limit 5/day per admin) |
+| Refusals chat (Telegram group bot) | — | `api/refusals-bot.js` (webhook), `api/refusals-report.js` (Vercel Cron 07:00 UTC), `api/refusals-setup.js`, `api/refusals-sheet-sync.js`; logic in `api/_refusals.js`, Google Sheets in `api/_sheets.js` + `google-sheets-refusals.gs` | `supabase-refusals.sql` |
 
 ## Hub files
 - `api/_telegram.js` — initData signature check, `rpc`, body parsing, errors: used by all `api/tg-*.js`.
-- `vercel.json` — security headers (CSP per page), function timeouts, `cleanUrls`.
-- `scripts/dev-server.js` — local server on :3000 that mimics Vercel (routes `api/`, applies `vercel.json` headers).
+- `vercel.json` — `cleanUrls`, function timeouts, cron, headers.
+- `scripts/dev-server.js` — local server on :3000 that mimics Vercel (static files with `cleanUrls` + `api/*.js` handlers).
 
 ## Access
 Admin data is protected by RLS (`is_admin()` over the `admins` email table); admin endpoints pass the

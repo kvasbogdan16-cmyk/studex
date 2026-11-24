@@ -2,14 +2,14 @@
 
 <!-- vibe-flow:project:begin -->
 ## 🧩 Project
-- **What it is:** Studex — a landing page where students find a first job, part-time work or volunteering, plus an admin CRM, business-card recognition and a Telegram Mini App
+- **What it is:** Studex — a landing page where students find a first job, part-time work or volunteering, plus an admin CRM, business-card recognition, a Telegram Mini App and a Telegram «refusals chat» bot with reports
 - **Stack:** plain HTML/CSS/JS frontend (no framework, no build step) + Node.js ≥20 serverless functions on Vercel (`api/*.js`, CommonJS); deps `@anthropic-ai/sdk`, `zod`; images via OpenAI GPT Image
 - **DB:** Postgres (Supabase) with RLS; migrations are root `supabase-*.sql` files run by hand in the Supabase SQL Editor in the order given in README.md; private Supabase Storage for card originals and images
-- **Deploy:** Vercel (`vercel.json`, prod https://studex-ochre.vercel.app), previews per branch · prod branch `main`
-- **Commands:** tests `npm test` (`node --test` over `tests/*.test.js`; being introduced) · types not used (plain JS) · dev `node scripts/dev-server.js . 3000` (http://localhost:3000) · build none
-- **Where things live:** landing `index.html` + `script.js` + `style.css` → `api/lead.js`; admin `admin.html` + `admin.js` (Supabase config from `api/config.js`); card scan `api/scan.js`; image generation `api/generate.js`; Telegram Mini App `tg.html` + `tg.js` + `api/tg-*.js`, shared Telegram helpers in `api/_telegram.js`
+- **Deploy:** Vercel (`vercel.json`, prod https://studex-ochre.vercel.app, Vercel Cron for `/api/refusals-report`), previews per branch · prod branch `main`
+- **Commands:** tests none yet (no test script in `package.json`) · types not used (plain JS) · dev `node scripts/dev-server.js . 3000` (http://localhost:3000) · build none
+- **Where things live:** landing `index.html` + `script.js` + `style.css` → `api/lead.js`; admin `admin.html` + `admin.js` (Supabase config from `api/config.js`); card scan `api/scan.js`; image generation `api/generate.js`; Telegram Mini App `tg.html` + `tg.js` + `api/tg-*.js`, shared Telegram helpers in `api/_telegram.js`; refusals bot `api/refusals-*.js` + `api/_refusals.js`, Google Sheets copy `api/_sheets.js` + `google-sheets-refusals.gs`
 - **i18n:** none — UI is Ukrainian only (`lang="uk"`)
-- **Access control:** admins = emails in table `public.admins`, checked by `public.is_admin()` in RLS (`supabase-admin.sql`); admin API endpoints require a Supabase `Bearer` token; Telegram users are verified by the initData signature (bot token) and reach the DB via `TG_SERVER_SECRET`; the public lead form is anonymous
+- **Access control:** admins = emails in table `public.admins`, checked by `public.is_admin()` in RLS (`supabase-admin.sql`); admin API endpoints require a Supabase `Bearer` token; Telegram users are verified by the initData signature (bot token) and reach the DB via `TG_SERVER_SECRET`; the refusals bot webhook checks Telegram's secret token header, cron/setup endpoints require `CRON_SECRET` / `TG_SERVER_SECRET`; the public lead form is anonymous
 <!-- vibe-flow:project:end -->
 
 <!-- vibe-flow:begin v1.3.5 -->
