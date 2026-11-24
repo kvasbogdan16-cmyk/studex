@@ -5,6 +5,7 @@ let db;
 const views = {
   loading: document.getElementById("view-loading"),
   login: document.getElementById("view-login"),
+  mfa: document.getElementById("view-mfa"),
   leads: document.getElementById("view-leads"),
   images: document.getElementById("view-images"),
 };
@@ -15,6 +16,15 @@ const userEmail = document.getElementById("user-email");
 const loginForm = document.getElementById("login-form");
 const loginError = document.getElementById("login-error");
 const loginSubmit = document.getElementById("login-submit");
+
+const mfaEnroll = document.getElementById("mfa-enroll");
+const mfaVerify = document.getElementById("mfa-verify");
+const mfaForm = document.getElementById("mfa-form");
+const mfaCode = document.getElementById("mfa-code");
+const mfaSubmit = document.getElementById("mfa-submit");
+const mfaError = document.getElementById("mfa-error");
+const mfaQr = document.getElementById("mfa-qr");
+const mfaSecret = document.getElementById("mfa-secret");
 const board = document.getElementById("board");
 const leadsError = document.getElementById("leads-error");
 const leadsSummary = document.getElementById("leads-summary");
@@ -84,6 +94,9 @@ function notify(message, isError = false) {
 // ----- Вхід і вихід -----
 
 async function openPanel(session) {
+  // Спершу другий фактор: без сесії aal2 воронку не відкриваємо взагалі.
+  if (!(await ensureMfa())) return;
+
   userEmail.textContent = session.user.email;
   userBox.hidden = false;
 
@@ -103,9 +116,167 @@ function showLogin(message = "") {
   leads = [];
   historyByLead = new Map();
   board.replaceChildren();
+  clearMfa();
   loginError.textContent = message;
   show("login");
 }
+
+async function logout() {
+  await db.auth.signOut();
+  showLogin();
+}
+
+// ----- Двофакторний вхід (TOTP) -----
+// Вибір кроку — чиста функція StudexMfa.mfaStep (admin-mfa.js). Будь-яка помилка тут
+// лишає людину на екрані 2FA: ensureMfa повертає true лише для сесії aal2.
+
+const MFA_FACTOR_NAME = "Studex admin";
+const MFA_CODE_PATTERN = /^[0-9]{6}$/;
+const MFA_QR_PREFIX = "data:image/";
+const HTTP_TOO_MANY_REQUESTS = 429;
+const MFA_MESSAGES = {
+  unavailable: "Не вдалося перевірити двофакторний вхід. Онови сторінку або спробуй пізніше.",
+  badFormat: "Введи 6 цифр коду.",
+  wrongCode: "Невірний або прострочений код. Спробуй ще раз.",
+  tooManyAttempts: "Забагато спроб. Зачекай хвилину.",
+  sessionLost: "Сесія завершилась. Увійди ще раз.",
+};
+
+let mfaFactorId = null;
+
+function clearMfa() {
+  mfaFactorId = null;
+  mfaQr.removeAttribute("src");
+  mfaSecret.textContent = "";
+  mfaCode.value = "";
+  mfaError.textContent = "";
+}
+
+// mode: "enroll" | "verify" | "error" — у режимі помилки форми коду немає, лише текст і «Вийти».
+function showMfa(mode, message = "") {
+  mfaEnroll.hidden = mode !== "enroll";
+  mfaVerify.hidden = mode !== "verify";
+  mfaForm.hidden = mode === "error";
+  mfaCode.value = "";
+  mfaError.textContent = message;
+  show("mfa");
+  if (mode !== "error") mfaCode.focus();
+}
+
+function failMfa(err) {
+  console.error(err);
+  clearMfa();
+  showMfa("error", MFA_MESSAGES.unavailable);
+  return false;
+}
+
+async function ensureMfa() {
+  try {
+    const [aalRes, factorsRes] = await Promise.all([
+      db.auth.mfa.getAuthenticatorAssuranceLevel(),
+      db.auth.mfa.listFactors(),
+    ]);
+    if (aalRes.error || factorsRes.error) return failMfa(aalRes.error || factorsRes.error);
+
+    const next = window.StudexMfa.mfaStep(aalRes.data, factorsRes.data);
+    if (next.step === "ok") return true;
+    if (next.step === "verify") {
+      clearMfa();
+      mfaFactorId = next.factorId;
+      showMfa("verify");
+      return false;
+    }
+    if (next.step === "enroll") return await enrollMfa(next.staleFactorIds);
+    return failMfa(new Error(`Unknown MFA step: ${next.step}`));
+  } catch (err) {
+    return failMfa(err);
+  }
+}
+
+// Прибирає непідтверджені фактори від обірваних спроб і показує новий QR-код.
+// Завжди повертає false: панель відкриється лише після введення коду.
+async function enrollMfa(staleFactorIds) {
+  for (const factorId of staleFactorIds) {
+    const { error } = await db.auth.mfa.unenroll({ factorId });
+    if (error) return failMfa(error);
+  }
+
+  const { data, error } = await db.auth.mfa.enroll({ factorType: "totp", friendlyName: MFA_FACTOR_NAME });
+  if (error) return failMfa(error);
+  if (!isUsableEnrollment(data)) return failMfa(new Error("mfa.enroll returned an unexpected response"));
+
+  mfaFactorId = data.id;
+  mfaQr.src = data.totp.qr_code;
+  mfaSecret.textContent = data.totp.secret;
+  showMfa("enroll");
+  return false;
+}
+
+// QR приймаємо лише як data:-картинку від supabase-js, ніколи як зовнішню адресу.
+function isUsableEnrollment(data) {
+  const totp = data && data.totp;
+  return Boolean(
+    totp && data.id && totp.secret && typeof totp.qr_code === "string" && totp.qr_code.startsWith(MFA_QR_PREFIX)
+  );
+}
+
+function mfaVerifyErrorMessage(error) {
+  return error.status === HTTP_TOO_MANY_REQUESTS ? MFA_MESSAGES.tooManyAttempts : MFA_MESSAGES.wrongCode;
+}
+
+mfaForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const code = mfaCode.value.trim();
+  if (!MFA_CODE_PATTERN.test(code)) {
+    mfaError.textContent = MFA_MESSAGES.badFormat;
+    return;
+  }
+  if (!mfaFactorId) {
+    mfaError.textContent = MFA_MESSAGES.unavailable;
+    return;
+  }
+
+  mfaSubmit.disabled = true;
+  mfaError.textContent = "";
+  try {
+    const { error } = await db.auth.mfa.challengeAndVerify({ factorId: mfaFactorId, code });
+    if (error) {
+      console.error(error);
+      mfaError.textContent = mfaVerifyErrorMessage(error);
+      mfaCode.value = "";
+      mfaCode.focus();
+      return;
+    }
+
+    const { data, error: sessionError } = await db.auth.getSession();
+    if (sessionError || !data.session) {
+      if (sessionError) console.error(sessionError);
+      showLogin(MFA_MESSAGES.sessionLost);
+      return;
+    }
+    clearMfa();
+    await openPanel(data.session);
+  } catch (err) {
+    console.error(err);
+    mfaError.textContent = MFA_MESSAGES.unavailable;
+  } finally {
+    mfaSubmit.disabled = false;
+  }
+});
+
+document.getElementById("mfa-copy").addEventListener("click", async () => {
+  const secret = mfaSecret.textContent;
+  if (!secret) return;
+  try {
+    await navigator.clipboard.writeText(secret);
+    notify("Секрет скопійовано.");
+  } catch (err) {
+    console.error(err);
+    notify("Не вдалося скопіювати. Виділи секрет і скопіюй вручну.", true);
+  }
+});
+
+document.getElementById("mfa-logout").addEventListener("click", logout);
 
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -139,10 +310,7 @@ loginForm.addEventListener("submit", async (e) => {
   openPanel(data.session);
 });
 
-document.getElementById("logout").addEventListener("click", async () => {
-  await db.auth.signOut();
-  showLogin();
-});
+document.getElementById("logout").addEventListener("click", logout);
 
 // ----- Дані -----
 

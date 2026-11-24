@@ -66,6 +66,44 @@
       </div>
     </section>
 
+    <!-- Двофакторний вхід: після пароля, до перевірки адміна -->
+    <section class="container admin-login" id="view-mfa" hidden>
+      <div class="login-card">
+        <span class="eyebrow">Двофакторний вхід</span>
+
+        <div class="mfa-block" id="mfa-enroll" hidden>
+          <h1 class="login-card__title">Захисти вхід кодом</h1>
+          <ol class="mfa-steps">
+            <li>Встанови на телефон застосунок Authenticator (Google, Microsoft, 1Password чи інший).</li>
+            <li>Відскануй у ньому QR-код або введи секрет вручну.</li>
+            <li>Введи нижче 6 цифр, які покаже застосунок.</li>
+          </ol>
+          <img class="mfa-qr" id="mfa-qr" alt="QR-код для застосунку Authenticator" width="200" height="200">
+          <div class="mfa-secret">
+            <span class="mfa-secret__label">Секрет для ручного введення</span>
+            <code class="mfa-secret__value" id="mfa-secret"></code>
+            <button type="button" class="btn btn--ghost btn--sm" id="mfa-copy">Скопіювати</button>
+          </div>
+          <p class="mfa-hint">Збережи секрет у менеджері паролів: якщо загубиш телефон, з ним можна відновити коди.</p>
+        </div>
+
+        <div class="mfa-block" id="mfa-verify" hidden>
+          <h1 class="login-card__title">Код підтвердження</h1>
+          <p class="login-card__text">Введи 6 цифр із застосунку Authenticator.</p>
+        </div>
+
+        <form class="apply__form" id="mfa-form" novalidate>
+          <div class="field">
+            <label for="mfa-code">Код із застосунку</label>
+            <input id="mfa-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+          </div>
+          <button type="submit" class="btn btn--primary apply__submit" id="mfa-submit">Підтвердити</button>
+        </form>
+        <p class="apply__error mfa-error" id="mfa-error" role="alert"></p>
+        <button type="button" class="mfa-logout" id="mfa-logout">Вийти</button>
+      </div>
+    </section>
+
     <!-- Воронка -->
     <section class="container admin-leads" id="view-leads" hidden>
       <div class="admin-leads__head">
@@ -277,6 +315,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"
           integrity="sha384-BWcjm9OdFth9TbhCxZPdm+gAOUMAzQy9nmTs12ioXdCcbVnJaPMn+fMUoQCLt60R"
           crossorigin="anonymous"></script>
+  <script src="admin-mfa.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

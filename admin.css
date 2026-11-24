@@ -121,6 +121,78 @@
   color: var(--ink-soft);
 }
 
+/* Двофакторний вхід: та сама картка, що й вхід */
+.mfa-block[hidden] { display: none; }
+
+.mfa-steps {
+  margin: 12px 0 20px;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  color: var(--ink-soft);
+}
+
+.mfa-qr {
+  display: block;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto 20px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.mfa-secret {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.mfa-secret__label {
+  grid-column: 1 / -1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.mfa-secret__value {
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--tint);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  user-select: all;
+}
+
+.mfa-hint {
+  margin: 12px 0 20px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mfa-error { margin-top: 16px; }
+
+.mfa-logout {
+  display: block;
+  margin: 16px auto 0;
+  padding: 4px 8px;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.mfa-logout:hover { color: var(--ink); }
+
 /* Список заявок */
 .admin-leads__head {
   display: flex;
