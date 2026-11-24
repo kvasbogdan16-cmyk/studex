@@ -2,6 +2,9 @@
   "name": "studex",
   "private": true,
   "description": "Studex: сайт, CRM і розпізнавання візиток через Claude API",
+  "scripts": {
+    "test": "node scripts/check-syntax.js"
+  },
   "engines": {
     "node": ">=20"
   },
