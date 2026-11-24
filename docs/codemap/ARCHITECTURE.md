@@ -7,7 +7,7 @@ the root HTML/CSS/JS files are served as they are, and every `api/*.js` file is 
 
 | Domain | Frontend | Server | DB (run in this order) |
 |---|---|---|---|
-| Lead form (landing) | `index.html`, `script.js`, `style.css` | `api/lead.js` → Supabase + Telegram notification | `supabase.sql` (`leads`) |
+| Lead form (landing) | `index.html`, `script.js`, `style.css` | `api/lead.js` → Supabase + Telegram notification | `supabase.sql` (`leads`), rate limit `supabase-ratelimit.sql` (DB trigger) |
 | Admin / CRM | `admin.html`, `admin.js`, `admin.css` | `api/config.js` (public Supabase settings) | `supabase-admin.sql` (`admins`, `is_admin()`), `supabase-crm.sql` (funnel, history) |
 | Business-card scan | admin «Візитка» | `api/scan.js` → Claude API | `supabase-scan.sql` (private storage) |
 | Telegram Mini App | `tg.html`, `tg.js`, `tg.css` | `api/tg-lead.js`, `api/tg-me.js`, `api/tg-setup.js`, shared `api/_telegram.js` | `supabase-telegram.sql` |
@@ -16,8 +16,8 @@ the root HTML/CSS/JS files are served as they are, and every `api/*.js` file is 
 
 ## Hub files
 - `api/_telegram.js` — initData signature check, `rpc`, body parsing, errors: used by all `api/tg-*.js`.
-- `vercel.json` — `cleanUrls`, function timeouts, cron, headers.
-- `scripts/dev-server.js` — local server on :3000 that mimics Vercel (static files with `cleanUrls` + `api/*.js` handlers).
+- `vercel.json` — `cleanUrls`, function timeouts, cron, security headers (CSP per page).
+- `scripts/dev-server.js` — local server on :3000 that mimics Vercel (static files with `cleanUrls`, `api/*.js` handlers, `vercel.json` headers; localhost only).
 
 ## Access
 Admin data is protected by RLS (`is_admin()` over the `admins` email table); admin endpoints pass the

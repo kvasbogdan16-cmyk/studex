@@ -1,6 +1,6 @@
 # Code index
 
-Root: `vibe-flow-install` · files: 70 · generator: gen-codemap.mjs (architecture-map skill)
+Root: `vibe-flow-install` · files: 75 · generator: gen-codemap.mjs (architecture-map skill)
 
 ## Reference
 - [routes.md](routes.md) — HTTP entry points: 0
@@ -13,7 +13,8 @@ Root: `vibe-flow-install` · files: 70 · generator: gen-codemap.mjs (architectu
 
 | Directory | Files | Large subdirectories |
 |---|---|---|
-| `.` (root) | 29 | |
+| `.` (root) | 30 | |
 | `api/` | 14 |  |
 | `githooks/` | 4 |  |
-| `scripts/` | 23 |  |
+| `scripts/` | 25 |  |
+| `tests/` | 2 |  |
